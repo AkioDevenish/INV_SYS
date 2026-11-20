@@ -1,59 +1,222 @@
 @import "tailwindcss";
 
+/* FullCalendar ships a hard table-style grid. Everything below softens it into
+   the same surface language as the rest of the app: one rounded, clipped frame,
+   hairlines instead of rules, and tinted event pills. */
+.full-calendar-shell {
+  isolation: isolate;
+  position: relative;
+  z-index: 10;
+}
+
+.full-calendar-shell .fc {
+  --fc-border-color: rgba(11, 40, 72, 0.07);
+  --fc-today-bg-color: rgba(36, 91, 147, 0.04);
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: rgba(36, 91, 147, 0.03);
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
+/* One rounded surface: the frame lives on the harness and the inner view clips
+   the table corners (and scrolls horizontally on narrow screens) while keeping
+   overflow visible on the harness so `+more` popovers are never clipped. */
+.full-calendar-shell .fc .fc-view-harness {
+  border: 1px solid var(--hairline);
+  border-radius: 1rem;
+  overflow: visible;
+  background: #ffffff;
+}
+
+.full-calendar-shell .fc .fc-view {
+  border-radius: calc(1rem - 1px);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.full-calendar-shell .fc .fc-scrollgrid,
+.full-calendar-shell .fc .fc-scrollgrid-section > td {
+  border: 0;
+}
+
+.full-calendar-shell .fc table.fc-scrollgrid tr > *:last-child {
+  border-right: 0;
+}
+
+.full-calendar-shell .fc .fc-scrollgrid-section-body:last-of-type tr:last-child > * {
+  border-bottom: 0;
+}
+
+.full-calendar-shell .fc .fc-col-header-cell {
+  background: rgba(36, 91, 147, 0.035);
+}
+
+.full-calendar-shell .fc .fc-col-header-cell-cushion {
+  padding: 0.7rem 0.35rem;
+  color: rgba(22, 36, 58, 0.65);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.full-calendar-shell .fc .fc-daygrid-day {
+  cursor: pointer;
+  transition: background 0.22s ease;
+}
+
+.full-calendar-shell .fc .fc-daygrid-day:hover {
+  background: rgba(36, 91, 147, 0.035);
+}
+
+.full-calendar-shell .fc .fc-daygrid-day-number {
+  display: inline-block;
+  color: rgba(22, 36, 58, 0.72);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  padding: 0.15rem 0.45rem;
+  margin: 0.3rem;
+  border-radius: 999px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.full-calendar-shell .fc .fc-day-other .fc-daygrid-day-number {
+  color: rgba(22, 36, 58, 0.65);
+}
+
+/* Today is marked on the date itself, which is quieter than washing the whole
+   cell and still unmistakable. */
+.full-calendar-shell .fc .fc-day-today .fc-daygrid-day-number {
+  background: var(--color-iica-700);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.full-calendar-shell .fc .fc-daygrid-day-events {
+  padding: 0 0.25rem 0.3rem;
+}
+
+/* Clean rounded event pills with a hairline border instead of a heavy left bracket. */
+.full-calendar-shell .fc .fc-event {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 0.5rem;
+  padding: 0.12rem 0.25rem;
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  box-shadow: none;
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    filter 0.16s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .full-calendar-shell .fc .fc-event:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px -9px rgba(11, 40, 72, 0.55);
+    filter: saturate(1.15);
+  }
+}
+
+.full-calendar-shell .fc .fc-daygrid-event-dot {
+  display: none;
+}
+
+.full-calendar-shell .fc .fc-daygrid-more-link {
+  cursor: pointer;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--color-iica-700);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.4rem;
+  transition: background 0.18s ease;
+}
+
+.full-calendar-shell .fc .fc-daygrid-more-link:hover {
+  background: var(--color-iica-50);
+}
+
+.full-calendar-shell .fc .fc-timegrid-slot {
+  height: 1.8rem;
+}
+
+.full-calendar-shell .fc .fc-timegrid-now-indicator-line {
+  border-color: #c2415b;
+  border-width: 1px 0 0;
+}
+
+.full-calendar-shell .fc .fc-timegrid-now-indicator-arrow {
+  border-color: #c2415b;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.full-calendar-shell .fc .fc-timegrid-axis-cushion,
+.full-calendar-shell .fc .fc-timegrid-slot-label-cushion {
+  font-size: 0.65rem;
+  color: rgba(22, 36, 58, 0.68);
+}
+
+.full-calendar-shell .fc .fc-popover {
+  background: #ffffff;
+  z-index: 30;
+  border: 1px solid var(--hairline);
+  border-radius: 0.9rem;
+  box-shadow: 0 18px 40px -24px rgba(11, 40, 72, 0.55);
+  overflow: hidden;
+}
+
+.full-calendar-shell .fc .fc-popover-header {
+  background: var(--color-iica-50);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.5rem 0.7rem;
+}
+
 @theme {
-  --color-ink-950: #05070c;
-  --color-ink-900: #080b13;
-  --color-ink-850: #0b0f19;
-  --color-ink-800: #10141f;
-  --color-ink-700: #171c2a;
-  --color-ink-600: #222839;
+  /* IICA institutional blue, sampled from the logo (--color-iica-700 is the logo blue). */
+  --color-iica-50: #f2f7fc;
+  --color-iica-100: #e1ecf7;
+  --color-iica-200: #c4d9ee;
+  --color-iica-300: #95b8de;
+  --color-iica-400: #5b8fc7;
+  --color-iica-500: #2f6bac;
+  --color-iica-600: #1b5391;
+  --color-iica-700: #14477d;
+  --color-iica-800: #0f3763;
+  --color-iica-900: #0b2848;
 
-  --color-brand-50: #ecfdf5;
-  --color-brand-200: #a7f3d0;
-  --color-brand-300: #6ee7b7;
-  --color-brand-400: #34d399;
-  --color-brand-500: #10b981;
-  --color-brand-600: #059669;
-  --color-brand-700: #047857;
+  /* Body text. Used with an opacity suffix, e.g. text-ink/65+. */
+  --color-ink: #16243a;
 
-  --color-gold-300: #f4d58d;
-  --color-gold-400: #e9b949;
+  /* Kept dark on purpose: modal and drawer scrims. */
+  --color-ink-950: #0b1220;
 
-  /* System stack — no web-font download, so the app works fully offline. */
-  --font-sans: "Inter var", Inter, ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas,
-    monospace;
+  /* Warn tone. The 400 is for fills and borders, the 600/700 for text on white. */
+  --color-gold-400: #d9a520;
+  --color-gold-500: #b8860b;
+  --color-gold-600: #8f6708;
+  --color-gold-700: #6f5008;
 
-  --radius-xl2: 1.25rem;
+  --font-sans: var(--font-jakarta, "Plus Jakarta Sans"), -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains, ui-monospace), "SF Mono", Menlo, monospace;
 }
 
 :root {
-  color-scheme: dark;
-  --surface: rgba(255, 255, 255, 0.032);
-  --surface-strong: rgba(255, 255, 255, 0.055);
-  --hairline: rgba(255, 255, 255, 0.08);
-  --hairline-strong: rgba(255, 255, 255, 0.14);
+  color-scheme: light;
+  --surface: #ffffff;
+  --hairline: rgba(22, 36, 58, 0.1);
+  --hairline-strong: rgba(22, 36, 58, 0.18);
+  --radius-xl2: 1.25rem;
 }
 
-* {
-  border-color: var(--hairline);
-}
-
-html,
-body {
-  height: 100%;
-}
-
-body {
-  background-color: var(--color-ink-950);
-  color: #e8ecf4;
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-
-/* Ambient light that gives the whole shell its depth. */
+/* A whisper of institutional blue so the white does not read as flat paper. */
 .app-aurora::before {
   content: "";
   position: fixed;
@@ -61,174 +224,267 @@ body {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(60rem 40rem at 12% -10%, rgba(16, 185, 129, 0.16), transparent 60%),
-    radial-gradient(50rem 34rem at 88% 0%, rgba(233, 185, 73, 0.09), transparent 62%),
-    radial-gradient(70rem 50rem at 50% 110%, rgba(59, 130, 246, 0.08), transparent 60%);
+    radial-gradient(60rem 40rem at 12% -10%, rgba(20, 71, 125, 0.05), transparent 60%),
+    radial-gradient(50rem 34rem at 88% 0%, rgba(20, 71, 125, 0.035), transparent 62%);
 }
 
-.panel {
-  background: linear-gradient(180deg, var(--surface-strong), var(--surface));
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-xl2);
-  backdrop-filter: blur(18px);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
-    0 24px 60px -32px rgba(0, 0, 0, 0.9);
+@layer base {
+  /* Keep the default border colour in @layer base so @layer components and
+     Tailwind v4 @layer utilities border-* classes override it cleanly. */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--hairline);
+  }
+
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body {
+    background-color: #ffffff;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Tailwind v4's Preflight gives buttons `cursor: default` to match the raw
+   * browser default, where v3 gave them `cursor: pointer`. The result is that
+   * every control in the app that is not a link or a `.btn` looks unclickable.
+   * Opt the whole app back in, in the base layer so any explicit `cursor-*`
+   * utility still overrides it.
+   */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]),
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  input[type="file"]:not(:disabled)::file-selector-button {
+    cursor: pointer;
+  }
+
+  /* And say so plainly when a control cannot be used. */
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  select:disabled,
+  textarea:disabled,
+  input:disabled {
+    cursor: not-allowed;
+  }
 }
 
-.panel-flat {
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  border-radius: 1rem;
+@layer components {
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-xl2);
+    box-shadow:
+      0 1px 2px rgba(11, 40, 72, 0.04),
+      0 12px 32px -24px rgba(11, 40, 72, 0.35);
+  }
+
+  .panel-flat {
+    background: var(--color-iica-50);
+    border: 1px solid var(--hairline);
+    border-radius: 1rem;
+  }
+
+  .field {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid var(--hairline-strong);
+    background: #ffffff;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.875rem;
+    color: var(--color-ink);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  }
+
+  .field::placeholder {
+    color: rgba(22, 36, 58, 0.65);
+  }
+
+  .field:focus {
+    border-color: var(--color-iica-600);
+    box-shadow: 0 0 0 3px rgba(27, 83, 145, 0.15);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+
+  .field:disabled {
+    opacity: 0.55;
+    background: var(--color-iica-50);
+  }
+
+  /* The native arrow hugs the right edge and differs per browser, so every
+     select draws the same chevron with breathing room instead. The padding is
+     !important because compact selects set their own pr-* utility. */
+  select.field {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2316243a' stroke-opacity='0.55' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.8rem center;
+    background-size: 0.9rem;
+    padding-right: 2.4rem !important;
+    text-overflow: ellipsis;
+  }
+
+  select.field[multiple],
+  select.field[size]:not([size="1"]) {
+    background-image: none;
+    padding-right: 0.85rem !important;
+  }
+
+  select.field option {
+    background: #ffffff;
+    color: var(--color-ink);
+  }
+
+  .label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: rgba(22, 36, 58, 0.82);
+    margin-bottom: 0.375rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+    padding: 0.6rem 1.05rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: transform 0.12s ease, opacity 0.15s ease, background 0.15s ease,
+      border-color 0.15s ease;
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .btn:active {
+      transform: translateY(1px);
+    }
+  }
+
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .btn:focus-visible {
+    outline: 2px solid var(--color-iica-600);
+    outline-offset: 2px;
+  }
+
+  .btn-danger:focus-visible {
+    outline-color: #be123c;
+  }
+
+  .btn-primary {
+    background: var(--color-iica-700);
+    color: #ffffff;
+    box-shadow: 0 8px 20px -12px rgba(20, 71, 125, 0.8);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-iica-800);
+  }
+
+  .btn-ghost {
+    background: #ffffff;
+    border-color: var(--hairline-strong);
+    color: var(--color-ink);
+  }
+
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--color-iica-50);
+    border-color: var(--color-iica-300);
+  }
+
+  .btn-danger {
+    background: #fff1f2;
+    border-color: rgba(190, 18, 60, 0.3);
+    color: #be123c;
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: #ffe4e6;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    border: 1px solid var(--hairline-strong);
+    padding: 0.15rem 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .table-shell {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.875rem;
+  }
+
+  .table-shell thead th {
+    text-align: left;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(22, 36, 58, 0.68);
+    background: var(--color-iica-50);
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--hairline);
+    white-space: nowrap;
+  }
+
+  .table-shell tbody td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid rgba(22, 36, 58, 0.07);
+    vertical-align: middle;
+  }
+
+  .table-shell tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .table-shell tbody tr {
+    transition: background 0.12s ease;
+  }
+
+  .table-shell tbody tr:hover {
+    background: var(--color-iica-50);
+  }
 }
 
-.hairline {
-  border-color: var(--hairline);
-}
-
-.field {
-  width: 100%;
-  border-radius: 0.75rem;
-  border: 1px solid var(--hairline-strong);
-  background: rgba(5, 7, 12, 0.6);
-  padding: 0.6rem 0.85rem;
-  font-size: 0.875rem;
-  color: #e8ecf4;
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-}
-
-.field::placeholder {
-  color: rgba(232, 236, 244, 0.35);
-}
-
-.field:focus {
-  border-color: var(--color-brand-500);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16);
-  background: rgba(5, 7, 12, 0.85);
-}
-
-.field:disabled {
-  opacity: 0.5;
-}
-
-select.field option {
-  background: #0b0f19;
-  color: #e8ecf4;
-}
-
-.label {
-  display: block;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: rgba(232, 236, 244, 0.5);
-  margin-bottom: 0.4rem;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border-radius: 0.75rem;
-  padding: 0.6rem 1.05rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  transition: transform 0.12s ease, opacity 0.15s ease, background 0.15s ease,
-    border-color 0.15s ease;
-  border: 1px solid transparent;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.btn:active {
-  transform: translateY(1px);
-}
-
-.btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: linear-gradient(180deg, var(--color-brand-400), var(--color-brand-600));
-  color: #04120c;
-  box-shadow: 0 10px 30px -14px rgba(16, 185, 129, 0.9);
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, var(--color-brand-300), var(--color-brand-500));
-}
-
-.btn-ghost {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--hairline-strong);
-  color: #e8ecf4;
-}
-
-.btn-ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.09);
-}
-
-.btn-danger {
-  background: rgba(244, 63, 94, 0.12);
-  border-color: rgba(244, 63, 94, 0.35);
-  color: #fda4af;
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: rgba(244, 63, 94, 0.2);
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  border-radius: 999px;
-  border: 1px solid var(--hairline-strong);
-  padding: 0.15rem 0.6rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.table-shell {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 0.875rem;
-}
-
-.table-shell thead th {
-  text-align: left;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(232, 236, 244, 0.45);
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--hairline);
-  white-space: nowrap;
-}
-
-.table-shell tbody td {
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  vertical-align: middle;
-}
-
-.table-shell tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.table-shell tbody tr {
-  transition: background 0.12s ease;
-}
-
-.table-shell tbody tr:hover {
-  background: rgba(255, 255, 255, 0.03);
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(22, 36, 58, 0.22) transparent;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -241,28 +497,161 @@ select.field option {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(22, 36, 58, 0.2);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(22, 36, 58, 0.34);
   background-clip: content-box;
 }
 
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    translate: 0 8px;
   }
   to {
     opacity: 1;
-    transform: none;
+    translate: none;
   }
 }
 
 .animate-rise {
-  animation: rise 0.4s ease both;
+  animation: rise 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+  to {
+    opacity: 1;
+    translate: none;
+  }
+}
+
+/* Used where a subtree is remounted on purpose (a view switch, a page of
+   results) so the new content arrives rather than snapping into place. */
+.animate-fade {
+  animation: fade-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes backdrop-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-backdrop {
+  animation: backdrop-fade 0.2s ease-out both;
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+    scale: 0.98;
+  }
+  to {
+    opacity: 1;
+    translate: none;
+    scale: none;
+  }
+}
+
+.animate-popover {
+  animation: popover-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes expand-fade {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+  to {
+    opacity: 1;
+    translate: none;
+  }
+}
+
+.animate-expand {
+  animation: expand-fade 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[role="tab"] {
+  transition:
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [role="tab"]:active:not(:disabled) {
+    transform: translateY(1px) scale(0.985);
+  }
+}
+
+[role="tab"] > span {
+  transition:
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Vestibular safety, and it also keeps the system feeling instant for anyone
+   who has asked their machine for that. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  [class*="active:scale"] {
+    transform: none !important;
+  }
+}
+
+@media print {
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .app-aurora::before,
+  [data-app-chrome="sidebar"],
+  [data-app-chrome="mobile-header"],
+  [data-app-chrome="mobile-drawer"],
+  .no-print {
+    display: none !important;
+  }
+
+  .panel,
+  .panel-flat {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .overflow-hidden,
+  .overflow-x-auto,
+  .overflow-y-auto {
+    overflow: visible !important;
+  }
+
+  .sticky {
+    position: static !important;
+  }
 }

@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run tests with coverage
+        run: node --test --experimental-test-coverage tests/*.test.mjs
+
+      - name: Build application
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/iica_inventory
+          AUTH_SECRET: ci-placeholder-auth-secret-minimum-32-chars
+          NEXT_PUBLIC_CURRENCY: USD
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  db-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: iica_inventory
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/iica_inventory
+      AUTH_SECRET: ci-placeholder-auth-secret-minimum-32-chars
+      NEXT_PUBLIC_CURRENCY: USD
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 20); do
+            if node -e "
+              const postgres = require('postgres');
+              const sql = postgres(process.env.DATABASE_URL, { prepare: false, onnotice: () => {} });
+              sql\`SELECT 1\`.then(() => sql.end()).then(() => process.exit(0)).catch(() => process.exit(1));
+            " 2>/dev/null; then
+              echo "PostgreSQL is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "PostgreSQL did not become ready in time" >&2
+          exit 1
+
+      - name: Verify schema setup and seed
+        run: npm run db:setup -- --output /tmp/ci-seed-credentials.txt
+        env:
+          ADMIN_EMAIL: ci-admin@iica.org
+          ADMIN_PASSWORD: CiTestPassword123
+
+      - name: Run test suite against PostgreSQL
+        run: npm test

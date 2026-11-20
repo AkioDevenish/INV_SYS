@@ -8,13 +8,14 @@ services:
       # Everything the app needs, so nothing has to be configured by hand.
       DATABASE_URL: postgresql://postgres:postgres@db:5432/iica
       AUTH_SECRET: codespaces-development-secret-not-for-production-use
+      CALENDAR_SYNC_SECRET: codespaces-development-calendar-sync-secret
       NEXT_TELEMETRY_DISABLED: "1"
     depends_on:
       db:
         condition: service_healthy
 
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -23,7 +24,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d iica"]
       interval: 3s
       timeout: 5s
       retries: 20

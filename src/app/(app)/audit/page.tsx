@@ -1,77 +1,152 @@
+import { Suspense } from "react";
 import { ShieldCheck } from "lucide-react";
 import { requirePermission } from "@/lib/auth";
-import { listAuditLogs } from "@/lib/queries";
-import { formatDateTime } from "@/lib/format";
+import { exportDatasetsFor } from "@/lib/export-datasets";
+import {
+  AUDIT_CATEGORIES,
+  AUDIT_MODULES,
+  auditCategoryCounts,
+  listAuditPage,
+} from "@/lib/queries";
+import { ExportDialog } from "@/components/export-dialog";
 import { EmptyState, PageHeader, SectionCard } from "@/components/ui";
+import { Pagination } from "@/components/pagination";
+import { AuditView, type SerializedAuditLog } from "./audit-view";
+import { AuditFilters } from "./filters";
 
 export const metadata = { title: "Audit trail" };
 
-const ACTION_STYLES: Record<string, string> = {
-  CREATE: "border-brand-400/30 bg-brand-500/10 text-brand-300",
-  UPDATE: "border-sky-400/30 bg-sky-400/10 text-sky-300",
-  DELETE: "border-rose-400/30 bg-rose-500/10 text-rose-300",
-  SIGN_IN: "border-white/15 bg-white/5 text-white/55",
-  RESET_PASSWORD: "border-gold-400/30 bg-gold-400/10 text-gold-300",
-};
+const PER_PAGE = 25;
 
-function styleFor(action: string) {
-  if (action.startsWith("MOVEMENT_")) return "border-gold-400/30 bg-gold-400/10 text-gold-300";
-  return ACTION_STYLES[action] ?? "border-white/15 bg-white/5 text-white/55";
+function one(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function AuditPage() {
-  await requirePermission("audit.view");
-  const logs = await listAuditLogs(200);
+export default async function AuditPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const user = await requirePermission("audit.view");
+  const rawParams = await searchParams;
+  const cleanParams: Record<string, string | undefined> = {
+    q: one(rawParams.q),
+    category: one(rawParams.category),
+    module: one(rawParams.module),
+    page: one(rawParams.page),
+  };
+
+  const parsedPage = Number(cleanParams.page);
+  const requestedPage =
+    Number.isInteger(parsedPage) && parsedPage >= 1 && parsedPage <= 1_000_000 ? parsedPage : 1;
+  const search = cleanParams.q?.trim() || undefined;
+  const moduleKey =
+    cleanParams.module && cleanParams.module in AUDIT_MODULES ? cleanParams.module : undefined;
+  const categoryKey =
+    cleanParams.category && cleanParams.category in AUDIT_CATEGORIES
+      ? cleanParams.category
+      : undefined;
+
+  const [initialResult, counts, exportDatasets] = await Promise.all([
+    listAuditPage({
+      search,
+      category: categoryKey,
+      module: moduleKey,
+      page: requestedPage,
+      perPage: PER_PAGE,
+    }),
+    auditCategoryCounts(search, moduleKey),
+    exportDatasetsFor(user.role, ["audit"]),
+  ]);
+
+  let page = requestedPage;
+  let logs = initialResult.rows;
+  let total = initialResult.total;
+
+  // Clamp out-of-range page requests so existing results are not hidden behind an empty state.
+  if (logs.length === 0 && page > 1) {
+    const knownTotal = total > 0 ? total : categoryKey ? (counts[categoryKey] ?? 0) : counts.all;
+    if (knownTotal > 0) {
+      const lastPage = Math.max(1, Math.ceil(knownTotal / PER_PAGE));
+      const clamped = await listAuditPage({
+        search,
+        category: categoryKey,
+        module: moduleKey,
+        page: lastPage,
+        perPage: PER_PAGE,
+      });
+      page = lastPage;
+      logs = clamped.rows;
+      total = Math.max(clamped.total, knownTotal);
+    } else {
+      page = 1;
+    }
+  }
+
+  const categories = Object.entries(AUDIT_CATEGORIES).map(([key, v]) => ({
+    key,
+    label: v.label,
+    count: counts[key] ?? 0,
+  }));
+
+  const modules = Object.entries(AUDIT_MODULES).map(([key, v]) => ({
+    key,
+    label: v.label,
+  }));
+
+  const serializedLogs: SerializedAuditLog[] = logs.map((log) => ({
+    ...log,
+    created_at:
+      log.created_at instanceof Date ? log.created_at.toISOString() : String(log.created_at),
+  }));
+
+  const filterKey = `${categoryKey ?? "all"}-${moduleKey ?? "all"}-${search ?? ""}-${page}`;
 
   return (
     <>
       <PageHeader
         eyebrow="Administration"
-        title="Audit trail"
-        description="An append-only record of who changed what, kept for accountability and audits."
+        title="TT Delegation Audit Trail"
+        description="Append-only activity log across inventory, vendors, calendar, stakeholders and accounts."
+        actions={
+          <ExportDialog
+            datasets={exportDatasets}
+            groups={[]}
+            defaultDataset="audit"
+            title="Export audit trail"
+            description="Download the recorded audit trail in Excel, CSV or JSON."
+          />
+        }
       />
 
-      <SectionCard
-        title="Recent activity"
-        description={`Showing the ${logs.length} most recent entries`}
-        bodyClassName="overflow-x-auto"
-      >
-        {logs.length === 0 ? (
-          <EmptyState icon={<ShieldCheck size={20} />} title="Nothing recorded yet" />
-        ) : (
-          <table className="table-shell min-w-[720px]">
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Who</th>
-                <th>Action</th>
-                <th>Entity</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((log) => (
-                <tr key={log.id}>
-                  <td className="whitespace-nowrap text-xs text-white/45">
-                    {formatDateTime(log.created_at)}
-                  </td>
-                  <td className="text-white/75">{log.user_label ?? "System"}</td>
-                  <td>
-                    <span className={`chip ${styleFor(log.action)}`}>
-                      {log.action.replace(/_/g, " ").toLowerCase()}
-                    </span>
-                  </td>
-                  <td className="text-white/55">
-                    {log.entity}
-                    {log.entity_id ? <span className="text-white/30"> #{log.entity_id}</span> : null}
-                  </td>
-                  <td className="max-w-[320px] truncate text-white/45">{log.details ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </SectionCard>
+      <Suspense fallback={<div className="mb-4 h-14" />}>
+        <AuditFilters categories={categories} modules={modules} total={counts.all} />
+      </Suspense>
+
+      {serializedLogs.length === 0 ? (
+        <SectionCard title="Nothing to show" description="No entries match those filters.">
+          <EmptyState
+            icon={<ShieldCheck size={20} />}
+            title="Nothing recorded here yet"
+            description="Try a different category, module or clear the search."
+          />
+        </SectionCard>
+      ) : (
+        <AuditView
+          logs={serializedLogs}
+          total={total}
+          filterKey={filterKey}
+          pagination={
+            <Pagination
+              page={page}
+              perPage={PER_PAGE}
+              total={total}
+              basePath="/audit"
+              params={cleanParams}
+            />
+          }
+        />
+      )}
     </>
   );
 }

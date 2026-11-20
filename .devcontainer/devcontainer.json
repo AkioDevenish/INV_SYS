@@ -1,17 +1,21 @@
 {
-  "name": "IICA Inventory",
+  "name": "IICA-TT Internal System",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-  "forwardPorts": [3000],
+  "forwardPorts": [3000, 5432],
   "portsAttributes": {
     "3000": {
-      "label": "IICA Inventory",
+      "label": "IICA-TT Internal System",
       "onAutoForward": "openBrowser"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
     }
   },
   "postCreateCommand": "bash .devcontainer/postCreate.sh",
-  "postAttachCommand": "npm run dev",
+  "postAttachCommand": "node -e \"const s=require('net').connect(3000,'127.0.0.1');s.on('connect',()=>{s.destroy();process.exit(0)});s.on('error',()=>process.exit(1))\" || npm run dev",
   "customizations": {
     "vscode": {
       "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
