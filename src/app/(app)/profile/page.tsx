@@ -7,6 +7,10 @@ import { PageHeader, SectionCard } from "@/components/ui";
 import { PERMISSION_COPY } from "@/lib/permission-copy";
 import { RoleBadge } from "@/components/role-badge";
 import { DetailsForm, PasswordForm } from "./profile-forms";
+import { RemindersCard } from "./reminders-card";
+import { getDigestFor, lastReminderFor } from "@/lib/reminders";
+import { isMailConfigured } from "@/lib/microsoft";
+import { sql } from "@/lib/db";
 
 export const metadata = { title: "Your profile" };
 
@@ -15,6 +19,11 @@ export default async function ProfilePage() {
   const user = await requireUser();
   const matrix = await getPermissionMatrix();
   const allowed = PERMISSIONS.filter((p) => canWith(matrix, user.role, p));
+  const [digest, last, [prefs]] = await Promise.all([
+    getDigestFor(user.userId),
+    lastReminderFor(user.userId),
+    sql<{ reminders_enabled: boolean }[]>`SELECT reminders_enabled FROM users WHERE id = ${user.userId}`,
+  ]);
 
   return (
     <>
@@ -33,6 +42,15 @@ export default async function ProfilePage() {
           >
             <PasswordForm />
           </SectionCard>
+
+          <RemindersCard
+            enabled={prefs?.reminders_enabled ?? true}
+            overdue={digest?.overdue ?? []}
+            upcoming={digest?.upcoming ?? []}
+            mailReady={isMailConfigured()}
+            lastSent={last?.status === "SENT" ? last.sent_at : null}
+            isAdmin={canWith(matrix, user.role, "users.manage")}
+          />
         </div>
 
         <div className="space-y-5">

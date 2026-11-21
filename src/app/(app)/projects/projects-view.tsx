@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   AlertTriangle,
   BookOpen,
@@ -12,6 +12,7 @@ import {
   FolderKanban,
   LayoutGrid,
   ListChecks,
+  Loader2,
   MessageSquareText,
   Search,
   Table2,
@@ -24,7 +25,9 @@ import { Pagination } from "@/components/pagination";
 import type { LessonRow, ProjectSummary, RefOption } from "@/lib/projects";
 import { formatDay, formatMoney, statusTone } from "@/lib/project-meta";
 import { Chip } from "./project-ui";
+import { bulkSetProjectStatusAction } from "./actions";
 import { FilterSelect } from "@/components/filter-select";
+import { SavedViews } from "@/components/saved-views";
 
 type ViewMode = "cards" | "table" | "phases" | "lessons";
 const VIEW_MODES: readonly ViewMode[] = ["cards", "table", "phases", "lessons"];
@@ -90,7 +93,10 @@ export function ProjectsView({
   fundingStatuses,
   myProjectIds,
   todayKey,
+  canManage = false,
 }: {
+  /** Managers can tick rows in the table and change their status together. */
+  canManage?: boolean;
   projects: ProjectSummary[];
   lessons: LessonRow[];
   statuses: RefOption[];
@@ -103,6 +109,9 @@ export function ProjectsView({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [ticked, setTicked] = useState<Set<number>>(new Set());
+  const [bulkPending, startBulk] = useTransition();
+  const [bulkError, setBulkError] = useState<string>();
 
   const rawView = (searchParams.get("view") ?? "cards").toLowerCase();
   const viewMode: ViewMode = (VIEW_MODES as readonly string[]).includes(rawView) ? (rawView as ViewMode) : "cards";
@@ -455,6 +464,7 @@ export function ProjectsView({
               ]}
             />
           )}
+          <SavedViews page="projects" />
           {hasFilters && (
             <button type="button" onClick={clearAll} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-iica-700 hover:bg-iica-50">
               Clear
@@ -614,9 +624,52 @@ export function ProjectsView({
                   ))}
                 </ul>
                 <div className="hidden overflow-x-auto md:block">
+                  {canManage && ticked.size > 0 && (
+                    <div className="animate-fade flex flex-wrap items-center gap-2 border-b border-iica-200 bg-iica-50/95 px-4 py-2.5 sm:px-5">
+                      <span className="text-xs font-semibold text-iica-900">{ticked.size} selected</span>
+                      <FilterSelect
+                        value=""
+                        ariaLabel="Set status for selected projects"
+                        className="min-w-[10rem]"
+                        options={[
+                          { value: "", label: "Set status…" },
+                          ...statuses.map((st) => ({ value: String(st.id), label: st.name })),
+                        ]}
+                        onChange={(v) => {
+                          if (!v) return;
+                          setBulkError(undefined);
+                          startBulk(async () => {
+                            const res = await bulkSetProjectStatusAction([...ticked], Number(v));
+                            if (res.error) setBulkError(res.error);
+                            else setTicked(new Set());
+                          });
+                        }}
+                      />
+                      {bulkPending && <Loader2 size={15} className="animate-spin text-iica-700" aria-label="Saving" />}
+                      {bulkError && <span className="text-xs text-rose-700">{bulkError}</span>}
+                      <button
+                        type="button"
+                        onClick={() => setTicked(new Set())}
+                        className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-ink/60 hover:bg-white hover:text-ink"
+                      >
+                        <X size={13} aria-hidden="true" /> Clear
+                      </button>
+                    </div>
+                  )}
                   <table className="table-shell w-full [&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-3.5">
                     <thead>
                       <tr>
+                        {canManage && (
+                          <th className="w-10 !pr-0">
+                            <input
+                              type="checkbox"
+                              aria-label="Select every project on this page"
+                              className="h-4 w-4 rounded border-ink/30 accent-iica-700"
+                              checked={pageProjects.length > 0 && pageProjects.every((p) => ticked.has(p.id))}
+                              onChange={(e) => setTicked(e.target.checked ? new Set(pageProjects.map((p) => p.id)) : new Set())}
+                            />
+                          </th>
+                        )}
                         <th>Project</th>
                         <th>Status</th>
                         <th>Phase</th>
@@ -628,7 +681,25 @@ export function ProjectsView({
                     </thead>
                     <tbody>
                       {pageProjects.map((p) => (
-                        <tr key={p.id}>
+                        <tr key={p.id} className={ticked.has(p.id) ? "bg-iica-50/75" : ""}>
+                          {canManage && (
+                            <td className="w-10 !pr-0">
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${p.title}`}
+                                className="h-4 w-4 rounded border-ink/30 accent-iica-700"
+                                checked={ticked.has(p.id)}
+                                onChange={() =>
+                                  setTicked((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(p.id)) next.delete(p.id);
+                                    else next.add(p.id);
+                                    return next;
+                                  })
+                                }
+                              />
+                            </td>
+                          )}
                           <td className="min-w-[14rem]">
                             <Link href={`/projects/${p.id}`} className="font-semibold text-ink hover:text-iica-700 hover:underline">
                               {p.title}

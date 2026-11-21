@@ -1,6 +1,7 @@
 import { requirePermission } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { listCalendarEvents, listUsers } from "@/lib/queries";
+import { listProjectCalendarItems } from "@/lib/projects";
 import { getCalendarSyncConfig, getCalendarWebhookSecret } from "@/lib/calendar-sync";
 import { PageHeader } from "@/components/ui";
 import {
@@ -33,7 +34,10 @@ export default async function CalendarPage({
   searchParams: Promise<{ month?: string | string[] }>;
 }) {
   const user = await requirePermission("calendar.view");
-  const canManage = await can(user.role, "calendar.manage");
+  const [canManage, canSeeProjects] = await Promise.all([
+    can(user.role, "calendar.manage"),
+    can(user.role, "projects.view"),
+  ]);
   const params = await searchParams;
   const rawMonth = Array.isArray(params.month) ? params.month[0] : params.month;
 
@@ -107,6 +111,30 @@ export default async function CalendarPage({
       organiser_name: event.organiser_name,
     };
   });
+
+  // Project milestones are read live from Projects, never stored as events, so
+  // they can't drift. Negative ids keep them apart from real events.
+  const projectItems = canSeeProjects ? await listProjectCalendarItems() : [];
+  const projectLinks: Record<number, number> = {};
+  const projectEvents = projectItems.map((item, i) => {
+    const id = -(i + 1);
+    projectLinks[id] = item.project_id;
+    yearSet.add(Number(item.date.slice(0, 4)));
+    return {
+      id,
+      title: item.title,
+      description: item.description,
+      event_type: "PROJECT",
+      // All-day events are stored 09:00–17:00 Trinidad time (UTC-4).
+      starts_at: `${item.date}T13:00:00.000Z`,
+      ends_at: `${item.date}T21:00:00.000Z`,
+      all_day: true,
+      location: null,
+      organiser_id: null,
+      organiser_name: null,
+    };
+  });
+
   const availableYears = [...yearSet].sort((a, b) => a - b);
 
   return (
@@ -129,7 +157,8 @@ export default async function CalendarPage({
       />
 
       <CalendarView
-        events={serializedEvents}
+        events={[...serializedEvents, ...projectEvents]}
+        projectLinks={projectLinks}
         canManage={canManage}
         initialMonth={initialMonth}
         todayKey={todayKey}

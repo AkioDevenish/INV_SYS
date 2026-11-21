@@ -6,15 +6,19 @@ import {
   AlertTriangle,
   BookOpen,
   Coins,
+  Download,
   ExternalLink,
   FileText,
   LayoutDashboard,
   ListChecks,
+  History,
   MessageSquareText,
+  MessagesSquare,
   Users,
 } from "lucide-react";
+import { CommentThread } from "@/components/comment-thread";
 import { RowActions } from "@/components/icon-button";
-import type { ProjectDetail, RefOption, ResourceOption, StakeholderOption } from "@/lib/projects";
+import type { ProjectActivity, ProjectDetail, RefOption, ResourceOption, StakeholderOption } from "@/lib/projects";
 import { formatDateTime } from "@/lib/format";
 import {
   ACTION_STATE_META,
@@ -26,6 +30,7 @@ import {
 } from "@/lib/project-meta";
 import { AddButton, Chip, EditIcon, FormModalButton, RemoveRecordButton } from "../project-ui";
 import {
+  formatBytes,
   ActionItemForm,
   ActionStateSelect,
   DocumentForm,
@@ -46,6 +51,8 @@ const TABS = [
   { key: "actions", label: "Actions", icon: ListChecks },
   { key: "documents", label: "Documents", icon: FileText },
   { key: "lessons", label: "Lessons", icon: BookOpen },
+  { key: "discussion", label: "Discussion", icon: MessagesSquare },
+  { key: "activity", label: "Activity", icon: History },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -78,6 +85,40 @@ function Empty({ children }: { children: ReactNode }) {
   return (
     <p className="rounded-xl border border-dashed border-ink/15 px-4 py-6 text-center text-xs text-ink/60">{children}</p>
   );
+}
+
+const ACTIVITY_DOT: Record<string, string> = {
+  CREATE: "bg-emerald-500",
+  UPDATE: "bg-iica-600",
+  DELETE: "bg-rose-500",
+  COMMENT: "bg-gold-500",
+};
+
+const ACTIVITY_NOUN: Record<string, string> = {
+  project: "the project",
+  project_staff: "a staff assignment",
+  project_stakeholder: "a stakeholder",
+  project_funding: "a funding record",
+  project_update: "a progress update",
+  project_action: "a follow-up action",
+  project_document: "a document",
+  project_lesson: "a lesson",
+};
+
+function activityVerb(a: ProjectActivity): string {
+  const noun = ACTIVITY_NOUN[a.entity] ?? a.entity.replace(/^project_/, "").replace(/_/g, " ");
+  switch (a.action) {
+    case "CREATE":
+      return a.entity === "project" ? "created the project" : `added ${noun}`;
+    case "UPDATE":
+      return `updated ${noun}`;
+    case "DELETE":
+      return a.entity === "project" ? "deleted the project" : `removed ${noun}`;
+    case "COMMENT":
+      return "commented";
+    default:
+      return `${a.action.toLowerCase().replace(/_/g, " ")} on ${noun}`;
+  }
 }
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -120,7 +161,10 @@ export function ProjectWorkspace({
   userId,
   todayKey,
   initialTab,
+  activity = [],
 }: {
+  /** Audit-trail entries for this project, newest first. */
+  activity?: ProjectActivity[];
   project: ProjectDetail;
   statusClass: string;
   phases: RefOption[];
@@ -794,7 +838,16 @@ export function ProjectWorkspace({
                           <FileText size={16} className="mt-0.5 shrink-0 text-iica-700" aria-hidden="true" />
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              {href ? (
+                              {d.file_name ? (
+                                <a
+                                  href={`/api/files/${d.resource_id}`}
+                                  target="_blank"
+                                  rel="noopener"
+                                  className="inline-flex items-center gap-1 text-sm font-medium text-ink hover:text-iica-700 hover:underline"
+                                >
+                                  {d.title} <Download size={11} aria-hidden="true" />
+                                </a>
+                              ) : href ? (
                                 <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-ink hover:text-iica-700 hover:underline">
                                   {d.title} <ExternalLink size={11} aria-hidden="true" />
                                 </a>
@@ -804,7 +857,13 @@ export function ProjectWorkspace({
                               {approval && <Chip className={approval.chip}>{approval.label}</Chip>}
                             </div>
                             <div className="text-xs text-ink/60">
-                              {[d.resource_type, d.version_label, d.link_purpose, `registered ${formatDay(d.registered_on)}`]
+                              {[
+                                d.file_name ? `${d.file_name} (${formatBytes(d.file_size ?? 0)})` : null,
+                                d.resource_type,
+                                d.version_label,
+                                d.link_purpose,
+                                `registered ${formatDay(d.registered_on)}`,
+                              ]
                                 .filter(Boolean)
                                 .join(" · ")}
                             </div>
@@ -873,6 +932,39 @@ export function ProjectWorkspace({
                     </li>
                   ))}
                 </ul>
+              )}
+            </Section>
+          )}
+
+          {tab === "discussion" && (
+            <Section
+              title="Discussion"
+              description="Questions and decisions about this project. Mention someone with @ to notify them; assigned staff are told about new comments."
+            >
+              <CommentThread type="project" id={p.id} />
+            </Section>
+          )}
+
+          {tab === "activity" && (
+            <Section title="Activity" description="Every change to this project, from the audit trail.">
+              {activity.length === 0 ? (
+                <Empty>No recorded activity yet.</Empty>
+              ) : (
+                <ol className="relative space-y-3 border-l border-ink/10 pl-5">
+                  {activity.map((a) => (
+                    <li key={a.id} className="relative">
+                      <span
+                        className={`absolute top-1.5 -left-[25px] h-2.5 w-2.5 rounded-full ring-4 ring-white ${ACTIVITY_DOT[a.action] ?? "bg-ink/30"}`}
+                        aria-hidden="true"
+                      />
+                      <div className="text-sm text-ink/85">
+                        <span className="font-semibold text-ink">{a.who}</span> {activityVerb(a)}
+                      </div>
+                      {a.details && <div className="mt-0.5 line-clamp-2 text-xs text-ink/55">{a.details}</div>}
+                      <div className="mt-0.5 text-[11px] text-ink/40">{formatDateTime(a.at)}</div>
+                    </li>
+                  ))}
+                </ol>
               )}
             </Section>
           )}

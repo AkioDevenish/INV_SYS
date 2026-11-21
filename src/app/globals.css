@@ -655,3 +655,382 @@
     position: static !important;
   }
 }
+
+/* =====================================================================
+ * Dark theme. Applied when the person picks Dark, or picks System and
+ * their computer is set to dark. Remaps the colour tokens so the same
+ * utility classes read correctly on a dark surface.
+ * ===================================================================== */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #1e1e21;
+  --hairline: rgba(255, 255, 255, 0.08);
+  --hairline-strong: rgba(255, 255, 255, 0.15);
+  --color-ink: #ececee;
+  --color-iica-50: #26262a;
+  --color-iica-100: #2d2d32;
+  --color-iica-200: #38383e;
+  --color-iica-300: #4d4d55;
+  --color-iica-400: #5d92cc;
+  --color-iica-500: #6d9fd8;
+  --color-iica-600: #4c88cf;
+  --color-iica-700: #3a77c0;
+  --color-iica-800: #a3c5ec;
+  --color-iica-900: #d3e3f6;
+  --color-gold-600: #e0b23a;
+  --color-gold-700: #ebc65f;
+  --color-rose-50: #2b1419;
+  --color-rose-100: #3a1a22;
+  --color-rose-200: #5c2533;
+  --color-rose-300: #7d3044;
+  --color-rose-700: #fda4af;
+  --color-rose-800: #fecdd3;
+  --color-emerald-50: #0f2a22;
+  --color-emerald-100: #12352b;
+  --color-emerald-200: #1c5040;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-amber-50: #2a2112;
+  --color-amber-100: #36290f;
+  --color-amber-200: #594419;
+  --color-amber-700: #fbbf24;
+  --color-amber-800: #fcd34d;
+  --color-amber-900: #fde68a;
+  --color-sky-50: #0f2433;
+  --color-sky-200: #1b4560;
+  --color-sky-700: #7dd3fc;
+  --color-sky-800: #a5e1fd;
+  --color-violet-50: #1e1834;
+  --color-violet-200: #3b2f66;
+  --color-violet-700: #c4b5fd;
+  --color-violet-800: #ddd6fe;
+  --color-teal-50: #0f2826;
+  --color-teal-200: #1c4a45;
+  --color-teal-700: #5eead4;
+  --color-teal-800: #99f6e4;
+  --color-fuchsia-50: #2a1430;
+  --color-fuchsia-200: #50265a;
+  --color-fuchsia-800: #f5d0fe;
+  --color-lime-50: #1b2610;
+  --color-lime-200: #34481a;
+  --color-lime-800: #d9f99d;
+  --color-indigo-50: #191d38;
+  --color-indigo-200: #303868;
+  --color-indigo-800: #c7d2fe;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: #1e1e21;
+    --hairline: rgba(255, 255, 255, 0.08);
+    --hairline-strong: rgba(255, 255, 255, 0.15);
+    --color-ink: #ececee;
+    --color-iica-50: #26262a;
+    --color-iica-100: #2d2d32;
+    --color-iica-200: #38383e;
+    --color-iica-300: #4d4d55;
+    --color-iica-400: #5d92cc;
+    --color-iica-500: #6d9fd8;
+    --color-iica-600: #4c88cf;
+    --color-iica-700: #3a77c0;
+    --color-iica-800: #a3c5ec;
+    --color-iica-900: #d3e3f6;
+    --color-gold-600: #e0b23a;
+    --color-gold-700: #ebc65f;
+    --color-rose-50: #2b1419;
+    --color-rose-100: #3a1a22;
+    --color-rose-200: #5c2533;
+    --color-rose-300: #7d3044;
+    --color-rose-700: #fda4af;
+    --color-rose-800: #fecdd3;
+    --color-emerald-50: #0f2a22;
+    --color-emerald-100: #12352b;
+    --color-emerald-200: #1c5040;
+    --color-emerald-700: #6ee7b7;
+    --color-emerald-800: #a7f3d0;
+    --color-amber-50: #2a2112;
+    --color-amber-100: #36290f;
+    --color-amber-200: #594419;
+    --color-amber-700: #fbbf24;
+    --color-amber-800: #fcd34d;
+    --color-amber-900: #fde68a;
+    --color-sky-50: #0f2433;
+    --color-sky-200: #1b4560;
+    --color-sky-700: #7dd3fc;
+    --color-sky-800: #a5e1fd;
+    --color-violet-50: #1e1834;
+    --color-violet-200: #3b2f66;
+    --color-violet-700: #c4b5fd;
+    --color-violet-800: #ddd6fe;
+    --color-teal-50: #0f2826;
+    --color-teal-200: #1c4a45;
+    --color-teal-700: #5eead4;
+    --color-teal-800: #99f6e4;
+    --color-fuchsia-50: #2a1430;
+    --color-fuchsia-200: #50265a;
+    --color-fuchsia-800: #f5d0fe;
+    --color-lime-50: #1b2610;
+    --color-lime-200: #34481a;
+    --color-lime-800: #d9f99d;
+    --color-indigo-50: #191d38;
+    --color-indigo-200: #303868;
+    --color-indigo-800: #c7d2fe;
+  }
+}
+
+/* Unlayered on purpose: these must outrank Tailwind utilities such as bg-white. */
+
+  :root[data-theme="dark"] body {
+    background-color: #141416;
+  }
+
+  :root[data-theme="dark"] .app-aurora::before {
+    background:
+      none;
+  }
+
+  /* White surfaces become the dark surface; text-white stays white. */
+  :root[data-theme="dark"] .bg-white,
+  :root[data-theme="dark"] [class~="sm:bg-white"] {
+    background-color: var(--surface);
+  }
+  :root[data-theme="dark"] [class*="bg-white/"] {
+    background-color: color-mix(in srgb, var(--surface) 88%, transparent);
+  }
+  :root[data-theme="dark"] [class*="hover:bg-white"]:hover {
+    background-color: var(--color-iica-100);
+  }
+  :root[data-theme="dark"] .hover\:bg-iica-800:hover {
+    background-color: #2f67a8;
+  }
+
+  :root[data-theme="dark"] .panel,
+  :root[data-theme="dark"] .field,
+  :root[data-theme="dark"] .btn-ghost,
+  :root[data-theme="dark"] select.field option {
+    background: var(--surface);
+  }
+  :root[data-theme="dark"] .panel {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 36px -24px rgba(0, 0, 0, 0.8);
+  }
+  :root[data-theme="dark"] .field {
+    color: var(--color-ink);
+  }
+  :root[data-theme="dark"] .field::placeholder {
+    color: rgba(236, 236, 238, 0.42);
+  }
+  :root[data-theme="dark"] select.field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ececee' stroke-opacity='0.6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+  :root[data-theme="dark"] .label {
+    color: rgba(236, 236, 238, 0.82);
+  }
+  :root[data-theme="dark"] .btn-primary:hover:not(:disabled) {
+    background: #2f67a8;
+  }
+  :root[data-theme="dark"] .btn-ghost:hover:not(:disabled) {
+    background: var(--color-iica-50);
+  }
+  :root[data-theme="dark"] .btn-danger {
+    background: #2b1419;
+    border-color: rgba(253, 164, 175, 0.3);
+    color: #fda4af;
+  }
+  :root[data-theme="dark"] .btn-danger:hover:not(:disabled) {
+    background: #3a1a22;
+  }
+  :root[data-theme="dark"] .table-shell thead th {
+    color: rgba(236, 236, 238, 0.62);
+  }
+  :root[data-theme="dark"] .table-shell tbody td {
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+  }
+
+  /* FullCalendar */
+  :root[data-theme="dark"] .full-calendar-shell .fc {
+    --fc-border-color: rgba(255, 255, 255, 0.08);
+    --fc-page-bg-color: var(--surface);
+    --fc-today-bg-color: rgba(76, 136, 207, 0.1);
+    --fc-neutral-bg-color: rgba(76, 136, 207, 0.06);
+  }
+  :root[data-theme="dark"] .full-calendar-shell .fc .fc-view-harness {
+    background: var(--surface);
+  }
+  :root[data-theme="dark"] .full-calendar-shell .fc .fc-col-header-cell-cushion,
+  :root[data-theme="dark"] .full-calendar-shell .fc .fc-daygrid-day-number {
+    color: rgba(236, 236, 238, 0.7);
+  }
+  :root[data-theme="dark"] .full-calendar-shell .fc .fc-popover {
+    background: var(--surface);
+  }
+
+  /* D3 charts draw axis text and gridlines in the light-theme ink. */
+  :root[data-theme="dark"] svg text {
+    fill: currentColor;
+  }
+
+@media (prefers-color-scheme: dark) {
+
+  :root:not([data-theme="light"]) body {
+    background-color: #141416;
+  }
+
+  :root:not([data-theme="light"]) .app-aurora::before {
+    background:
+      none;
+  }
+
+  /* White surfaces become the dark surface; text-white stays white. */
+  :root:not([data-theme="light"]) .bg-white,
+  :root:not([data-theme="light"]) [class~="sm:bg-white"] {
+    background-color: var(--surface);
+  }
+  :root:not([data-theme="light"]) [class*="bg-white/"] {
+    background-color: color-mix(in srgb, var(--surface) 88%, transparent);
+  }
+  :root:not([data-theme="light"]) [class*="hover:bg-white"]:hover {
+    background-color: var(--color-iica-100);
+  }
+  :root:not([data-theme="light"]) .hover\:bg-iica-800:hover {
+    background-color: #2f67a8;
+  }
+
+  :root:not([data-theme="light"]) .panel,
+  :root:not([data-theme="light"]) .field,
+  :root:not([data-theme="light"]) .btn-ghost,
+  :root:not([data-theme="light"]) select.field option {
+    background: var(--surface);
+  }
+  :root:not([data-theme="light"]) .panel {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 36px -24px rgba(0, 0, 0, 0.8);
+  }
+  :root:not([data-theme="light"]) .field {
+    color: var(--color-ink);
+  }
+  :root:not([data-theme="light"]) .field::placeholder {
+    color: rgba(236, 236, 238, 0.42);
+  }
+  :root:not([data-theme="light"]) select.field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ececee' stroke-opacity='0.6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+  :root:not([data-theme="light"]) .label {
+    color: rgba(236, 236, 238, 0.82);
+  }
+  :root:not([data-theme="light"]) .btn-primary:hover:not(:disabled) {
+    background: #2f67a8;
+  }
+  :root:not([data-theme="light"]) .btn-ghost:hover:not(:disabled) {
+    background: var(--color-iica-50);
+  }
+  :root:not([data-theme="light"]) .btn-danger {
+    background: #2b1419;
+    border-color: rgba(253, 164, 175, 0.3);
+    color: #fda4af;
+  }
+  :root:not([data-theme="light"]) .btn-danger:hover:not(:disabled) {
+    background: #3a1a22;
+  }
+  :root:not([data-theme="light"]) .table-shell thead th {
+    color: rgba(236, 236, 238, 0.62);
+  }
+  :root:not([data-theme="light"]) .table-shell tbody td {
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+  }
+
+  /* FullCalendar */
+  :root:not([data-theme="light"]) .full-calendar-shell .fc {
+    --fc-border-color: rgba(255, 255, 255, 0.08);
+    --fc-page-bg-color: var(--surface);
+    --fc-today-bg-color: rgba(76, 136, 207, 0.1);
+    --fc-neutral-bg-color: rgba(76, 136, 207, 0.06);
+  }
+  :root:not([data-theme="light"]) .full-calendar-shell .fc .fc-view-harness {
+    background: var(--surface);
+  }
+  :root:not([data-theme="light"]) .full-calendar-shell .fc .fc-col-header-cell-cushion,
+  :root:not([data-theme="light"]) .full-calendar-shell .fc .fc-daygrid-day-number {
+    color: rgba(236, 236, 238, 0.7);
+  }
+  :root:not([data-theme="light"]) .full-calendar-shell .fc .fc-popover {
+    background: var(--surface);
+  }
+
+  /* D3 charts draw axis text and gridlines in the light-theme ink. */
+  :root:not([data-theme="light"]) svg text {
+    fill: currentColor;
+  }
+}
+
+/* Calendar event colours, per type. Light values match the original palette;
+   dark ones mix each accent into the dark surface. */
+:root {
+  --cal-meeting-tint: #e0edff;
+  --cal-meeting-border: #a3c6fa;
+  --cal-meeting-text: #19417d;
+  --cal-mission-tint: #daf2e6;
+  --cal-mission-border: #8fd4b2;
+  --cal-mission-text: #155236;
+  --cal-leave-tint: #ebedf2;
+  --cal-leave-border: #c5cbd6;
+  --cal-leave-text: #374151;
+  --cal-holiday-tint: #fef0c3;
+  --cal-holiday-border: #f5cc6a;
+  --cal-holiday-text: #784a0e;
+  --cal-deadline-tint: #fde2e4;
+  --cal-deadline-border: #f4a6ad;
+  --cal-deadline-text: #881d2a;
+  --cal-project-tint: #d5f3ef;
+  --cal-project-border: #8bd8cd;
+  --cal-project-text: #115e56;
+  --cal-other-tint: #ede7fb;
+  --cal-other-border: #c4b2f0;
+  --cal-other-text: #482d82;
+}
+:root[data-theme="dark"] {
+  --cal-meeting-tint: color-mix(in srgb, #2563eb 24%, #1e1e21);
+  --cal-meeting-border: color-mix(in srgb, #2563eb 55%, #1e1e21);
+  --cal-meeting-text: color-mix(in srgb, #2563eb 35%, #ffffff);
+  --cal-mission-tint: color-mix(in srgb, #16a34a 24%, #1e1e21);
+  --cal-mission-border: color-mix(in srgb, #16a34a 55%, #1e1e21);
+  --cal-mission-text: color-mix(in srgb, #16a34a 35%, #ffffff);
+  --cal-leave-tint: color-mix(in srgb, #64748b 24%, #1e1e21);
+  --cal-leave-border: color-mix(in srgb, #64748b 55%, #1e1e21);
+  --cal-leave-text: color-mix(in srgb, #64748b 35%, #ffffff);
+  --cal-holiday-tint: color-mix(in srgb, #d97706 24%, #1e1e21);
+  --cal-holiday-border: color-mix(in srgb, #d97706 55%, #1e1e21);
+  --cal-holiday-text: color-mix(in srgb, #d97706 35%, #ffffff);
+  --cal-deadline-tint: color-mix(in srgb, #dc2626 24%, #1e1e21);
+  --cal-deadline-border: color-mix(in srgb, #dc2626 55%, #1e1e21);
+  --cal-deadline-text: color-mix(in srgb, #dc2626 35%, #ffffff);
+  --cal-project-tint: color-mix(in srgb, #0d9488 24%, #1e1e21);
+  --cal-project-border: color-mix(in srgb, #0d9488 55%, #1e1e21);
+  --cal-project-text: color-mix(in srgb, #0d9488 35%, #ffffff);
+  --cal-other-tint: color-mix(in srgb, #7c3aed 24%, #1e1e21);
+  --cal-other-border: color-mix(in srgb, #7c3aed 55%, #1e1e21);
+  --cal-other-text: color-mix(in srgb, #7c3aed 35%, #ffffff);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --cal-meeting-tint: color-mix(in srgb, #2563eb 24%, #1e1e21);
+    --cal-meeting-border: color-mix(in srgb, #2563eb 55%, #1e1e21);
+    --cal-meeting-text: color-mix(in srgb, #2563eb 35%, #ffffff);
+    --cal-mission-tint: color-mix(in srgb, #16a34a 24%, #1e1e21);
+    --cal-mission-border: color-mix(in srgb, #16a34a 55%, #1e1e21);
+    --cal-mission-text: color-mix(in srgb, #16a34a 35%, #ffffff);
+    --cal-leave-tint: color-mix(in srgb, #64748b 24%, #1e1e21);
+    --cal-leave-border: color-mix(in srgb, #64748b 55%, #1e1e21);
+    --cal-leave-text: color-mix(in srgb, #64748b 35%, #ffffff);
+    --cal-holiday-tint: color-mix(in srgb, #d97706 24%, #1e1e21);
+    --cal-holiday-border: color-mix(in srgb, #d97706 55%, #1e1e21);
+    --cal-holiday-text: color-mix(in srgb, #d97706 35%, #ffffff);
+    --cal-deadline-tint: color-mix(in srgb, #dc2626 24%, #1e1e21);
+    --cal-deadline-border: color-mix(in srgb, #dc2626 55%, #1e1e21);
+    --cal-deadline-text: color-mix(in srgb, #dc2626 35%, #ffffff);
+    --cal-project-tint: color-mix(in srgb, #0d9488 24%, #1e1e21);
+    --cal-project-border: color-mix(in srgb, #0d9488 55%, #1e1e21);
+    --cal-project-text: color-mix(in srgb, #0d9488 35%, #ffffff);
+    --cal-other-tint: color-mix(in srgb, #7c3aed 24%, #1e1e21);
+    --cal-other-border: color-mix(in srgb, #7c3aed 55%, #1e1e21);
+    --cal-other-text: color-mix(in srgb, #7c3aed 35%, #ffffff);
+  }
+}

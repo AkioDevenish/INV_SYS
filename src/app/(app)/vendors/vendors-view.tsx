@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/modal";
 import { FilterSelect } from "@/components/filter-select";
+import { SavedViews } from "@/components/saved-views";
 import { Pagination } from "@/components/pagination";
 import { EmptyState } from "@/components/ui";
 import {
@@ -557,6 +558,7 @@ export function VendorsView({
             />
           )}
 
+          <SavedViews page="vendors" />
           {hasActiveFilters && (
             <button
               type="button"

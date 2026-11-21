@@ -14,7 +14,7 @@ const baselineCsp = [
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' blob: data:",
-  "font-src 'self'",
+  "font-src 'self' data:",
   "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -28,7 +28,6 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-  { key: "Content-Security-Policy", value: baselineCsp },
   ...(process.env.NODE_ENV === "production"
     ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]
     : []),
@@ -44,6 +43,12 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders,
+      },
+      {
+        // Uploaded files and the reminder-email preview send their own,
+        // stricter policy; config headers would otherwise overwrite it.
+        source: "/((?!api/files/|api/reminders/preview).*)",
+        headers: [{ key: "Content-Security-Policy", value: baselineCsp }],
       },
     ];
   },

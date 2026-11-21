@@ -26,6 +26,10 @@ import {
 import { BrandLockup, BrandMark } from "./brand";
 import { APP_NAME } from "@/lib/brand";
 import { lockBodyScroll } from "./modal";
+import { SearchPalette, SearchTrigger } from "./search-palette";
+import { NotificationBell } from "./notification-bell";
+import { ThemeToggle } from "./theme-toggle";
+import type { ThemeChoice } from "@/lib/theme";
 import type { NavSection } from "./nav-config";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 import { initials } from "@/lib/format";
@@ -62,6 +66,7 @@ type Props = {
   user: { name: string; role: Role };
   logout: () => Promise<void>;
   children: React.ReactNode;
+  theme?: ThemeChoice;
 };
 
 function isItemActive(pathname: string, href: string, match?: string[]) {
@@ -69,7 +74,7 @@ function isItemActive(pathname: string, href: string, match?: string[]) {
   return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
-export function AppShell({ sections, user, logout, children }: Props) {
+export function AppShell({ sections, user, logout, children, theme = "system" }: Props) {
   const pathname = usePathname();
   const [openPathname, setOpenPathname] = useState<string | null>(null);
   const open = openPathname === pathname;
@@ -160,11 +165,13 @@ export function AppShell({ sections, user, logout, children }: Props) {
 
   const renderNav = (onNavigate?: () => void) => (
     <nav aria-label="Primary" className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
-      {sections.map((section) => (
-        <div key={section.title}>
-          <div className="px-3 pb-1.5 text-[11px] font-semibold text-ink/65">
-            {section.title}
-          </div>
+      {sections.map((section, i) => (
+        <div key={section.title || `section-${i}`}>
+          {section.title && (
+            <div className="px-3 pb-1.5 text-[11px] font-semibold text-ink/65">
+              {section.title}
+            </div>
+          )}
           <ul className="space-y-1">
             {section.items.map((item) => {
               const Icon = ICONS[item.icon] ?? Boxes;
@@ -222,6 +229,7 @@ export function AppShell({ sections, user, logout, children }: Props) {
             </span>
           </span>
         </Link>
+        <ThemeToggle initial={theme} />
         <form action={logout}>
           <button
             type="submit"
@@ -237,6 +245,7 @@ export function AppShell({ sections, user, logout, children }: Props) {
 
   return (
     <div className="flex min-h-screen">
+      <SearchPalette sections={sections} />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-xl focus:bg-iica-700 focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg focus:outline-2 focus:outline-offset-2 focus:outline-iica-900"
@@ -249,12 +258,18 @@ export function AppShell({ sections, user, logout, children }: Props) {
         data-app-chrome="sidebar"
         inert={open || undefined}
         aria-hidden={open || undefined}
-        className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-ink/8 bg-white lg:flex"
+        className="sticky top-0 z-30 hidden h-screen w-[248px] shrink-0 flex-col border-r border-ink/8 bg-white lg:flex"
       >
         <div className="border-b border-ink/8 px-4 py-4">
-          <Link href="/" className="inline-block rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iica-600">
-            <BrandLockup />
-          </Link>
+          <div className="flex items-start justify-between gap-2">
+            <Link href="/" className="inline-block rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iica-600">
+              <BrandLockup />
+            </Link>
+            <NotificationBell />
+          </div>
+          <div className="mt-3.5">
+            <SearchTrigger variant="sidebar" />
+          </div>
         </div>
         {renderNav()}
         {renderAccount()}
@@ -327,6 +342,9 @@ export function AppShell({ sections, user, logout, children }: Props) {
               <span className="truncate text-sm font-semibold text-ink">{activeTitle}</span>
             </Link>
           </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+          <SearchTrigger variant="icon" />
+          <NotificationBell align="right" />
           <Link
             href="/profile"
             aria-label={`Profile (${user.name})`}
@@ -334,6 +352,7 @@ export function AppShell({ sections, user, logout, children }: Props) {
           >
             {initials(user.name)}
           </Link>
+          </div>
         </header>
 
         <main

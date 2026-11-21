@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FilterSelect } from "@/components/filter-select";
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Check,
   CheckCircle2,
@@ -57,7 +58,9 @@ export function UsersView({
 }) {
   const [roleFilter, setRoleFilter] = useState<"ALL" | Role>("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "DISABLED">("ALL");
-  const [search, setSearch] = useState("");
+  // App-wide search links here with ?q=<email>, so start filtered by it.
+  const linkQuery = useSearchParams().get("q") ?? "";
+  const [search, setSearch] = useState(linkQuery);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [editingUser, setEditingUser] = useState<UserWithTempFlag | null>(null);

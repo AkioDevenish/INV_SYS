@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
 import { getCurrentUser, requirePermission } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { listUsers } from "@/lib/queries";
@@ -10,6 +10,7 @@ import {
   getReferenceLists,
   isAssignedToProject,
   listResourceOptions,
+  listProjectActivity,
   listStakeholderOptions,
 } from "@/lib/projects";
 import { astTodayKey, statusTone } from "@/lib/project-meta";
@@ -54,6 +55,7 @@ export default async function ProjectPage({
     searchParams,
   ]);
   if (!project) notFound();
+  const activity = await listProjectActivity(id);
 
   const [users, directory, resources] = await Promise.all([
     canManage ? listUsers() : Promise.resolve([]),
@@ -83,12 +85,17 @@ export default async function ProjectPage({
         title={project.title}
         description={project.purpose ?? undefined}
         actions={
-          canManage ? (
-            <>
-              <EditProjectButton project={project} refs={formRefs} />
-              <DeleteProjectButton id={project.id} title={project.title} />
-            </>
-          ) : null
+          <>
+            <Link href={`/projects/${project.id}/print`} className="btn btn-ghost">
+              <Printer size={15} /> Summary
+            </Link>
+            {canManage && (
+              <>
+                <EditProjectButton project={project} refs={formRefs} />
+                <DeleteProjectButton id={project.id} title={project.title} />
+              </>
+            )}
+          </>
         }
       />
 
@@ -106,6 +113,7 @@ export default async function ProjectPage({
         userId={user.userId}
         todayKey={astTodayKey()}
         initialTab={tab}
+        activity={activity}
       />
     </>
   );

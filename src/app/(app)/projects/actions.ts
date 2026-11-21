@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
+import { notify } from "@/lib/notifications";
 import {
   assertPermission,
   assertSignedIn,
@@ -322,6 +323,27 @@ export async function saveStaffAction(_prev: ProjectState, fd: FormData): Promis
         if (dupe) throw new InputError("That person already holds this role on the project.");
       }
 
+      let previousUser: number | null = null;
+      if (id) {
+        const [prev] = await tx<{ user_id: number }[]>`SELECT user_id FROM project_staff WHERE id = ${id}`;
+        previousUser = prev?.user_id ?? null;
+      }
+      if (previousUser !== userId) {
+        const [info] = await tx<{ title: string; role: string }[]>`
+          SELECT p.title, r.name AS role FROM projects p, project_roles r WHERE p.id = ${projectId} AND r.id = ${roleId}`;
+        await notify(
+          {
+            userId,
+            actorId: user.userId,
+            kind: "project_added",
+            title: `You were added to ${info?.title ?? "a project"}`,
+            body: info ? `Role: ${info.role}.` : null,
+            href: `/projects/${projectId}`,
+          },
+          tx,
+        );
+      }
+
       if (id) {
         const [updated] = await tx<{ id: number }[]>`
           UPDATE project_staff
@@ -544,6 +566,27 @@ export async function saveActionItemAction(_prev: ProjectState, fd: FormData): P
           completed = astTodayKey();
         }
       }
+      let previousAssignee: number | null = null;
+      if (id) {
+        const [prev] = await tx<{ assigned_user_id: number | null }[]>`
+          SELECT assigned_user_id FROM project_actions WHERE id = ${id}`;
+        previousAssignee = prev?.assigned_user_id ?? null;
+      }
+      if (assignee && assignee !== previousAssignee) {
+        const [proj] = await tx<{ title: string }[]>`SELECT title FROM projects WHERE id = ${projectId}`;
+        await notify(
+          {
+            userId: assignee,
+            actorId: user.userId,
+            kind: "action_assigned",
+            title: `Action assigned to you: ${description.slice(0, 120)}`,
+            body: `${proj?.title ?? "Project"}${due ? ` · due ${due}` : ""}`,
+            href: `/projects/${projectId}?tab=actions`,
+          },
+          tx,
+        );
+      }
+
       if (id) {
         const [updated] = await tx<{ id: number }[]>`
           UPDATE project_actions SET description = ${description}, assigned_user_id = ${assignee}, due_date = ${due},
@@ -643,6 +686,28 @@ function safeUrl(raw: string | null): string | null {
   }
 }
 
+/* Uploaded files are kept in the database next to their document record.
+   Hosting caps a request at about 4.5 MB, so files stop at 4 MB. */
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+type Upload = { filename: string; mime: string; bytes: Buffer };
+
+async function readUpload(raw: FormDataEntryValue | null): Promise<Upload | null> {
+  if (!raw || typeof raw === "string" || raw.size === 0) return null;
+  if (raw.size > MAX_UPLOAD_BYTES) throw new InputError("Files can be up to 4 MB. Link larger files from SharePoint instead.");
+  const filename = (raw.name || "file").replace(/[\\/\r\n"]/g, "_").slice(0, 200);
+  return { filename, mime: (raw.type || "application/octet-stream").slice(0, 100), bytes: Buffer.from(await raw.arrayBuffer()) };
+}
+
+async function storeUpload(tx: SqlExecutor, resourceId: number, f: Upload, userId: number) {
+  await tx`
+    INSERT INTO project_files (resource_id, filename, mime_type, size_bytes, data, uploaded_by)
+    VALUES (${resourceId}, ${f.filename}, ${f.mime}, ${f.bytes.length}, ${f.bytes}, ${userId})
+    ON CONFLICT (resource_id) DO UPDATE
+       SET filename = EXCLUDED.filename, mime_type = EXCLUDED.mime_type, size_bytes = EXCLUDED.size_bytes,
+           data = EXCLUDED.data, uploaded_by = EXCLUDED.uploaded_by, uploaded_at = now()`;
+}
+
 export async function saveDocumentAction(_prev: ProjectState, fd: FormData): Promise<ProjectState> {
   try {
     await ensureSchema();
@@ -652,6 +717,7 @@ export async function saveDocumentAction(_prev: ProjectState, fd: FormData): Pro
     const purpose = optText(fd, "link_purpose", 100);
     const existingId = optId(fd, "existing_resource_id", "Existing document");
     const resourceId = optId(fd, "resource_id", "Document");
+    const upload = await readUpload(fd.get("file"));
 
     await sql.begin(async (tx) => {
       if (!(await projectExists(projectId, tx))) throw new InputError("That project no longer exists.");
@@ -676,7 +742,7 @@ export async function saveDocumentAction(_prev: ProjectState, fd: FormData): Pro
         return;
       }
 
-      const title = optText(fd, "title", 300);
+      const title = optText(fd, "title", 300) ?? (upload ? upload.filename.replace(/\.[^.]+$/, "").slice(0, 300) : null);
       if (!title) throw new InputError("Give the document a title.");
       const type = optText(fd, "resource_type", 50);
       const url = safeUrl(optText(fd, "url", 2000));
@@ -697,12 +763,14 @@ export async function saveDocumentAction(_prev: ProjectState, fd: FormData): Pro
            WHERE id = ${resourceId}
            RETURNING id`;
         if (!updated) throw new InputError("That document no longer exists.");
+        if (upload) await storeUpload(tx, resourceId, upload, user.userId);
       } else {
         const [row] = await tx<{ id: number }[]>`
           INSERT INTO document_resources (title, resource_type, url, version_label, approval_state, registered_on, created_by)
           VALUES (${title}, ${type}, ${url}, ${version}, ${approval}, ${astTodayKey()}::date, ${user.userId})
           RETURNING id`;
         await tx`INSERT INTO project_documents (project_id, resource_id, link_purpose) VALUES (${projectId}, ${row.id}, ${purpose})`;
+        if (upload) await storeUpload(tx, row.id, upload, user.userId);
       }
 
       await tx`UPDATE projects SET updated_at = now() WHERE id = ${projectId}`;
@@ -972,5 +1040,32 @@ export async function deleteReferenceAction(_prev: ProjectState, fd: FormData): 
       return { error: "This entry is still used by projects, so it can't be removed. Rename it, or reassign those projects first." };
     }
     return failure(error, "The entry couldn't be removed.");
+  }
+}
+
+/** Sets the operational status of several projects at once. Managers only. */
+export async function bulkSetProjectStatusAction(rawIds: number[], statusId: number): Promise<ProjectState> {
+  try {
+    await ensureSchema();
+    const user = await assertPermission("projects.manage");
+    const ids = [...new Set(rawIds.filter((n) => Number.isSafeInteger(n) && n > 0))].slice(0, 500);
+    if (!ids.length) return { error: "Select at least one project." };
+    const status = positiveInt(statusId);
+    if (!status) return { error: "Choose a status." };
+    await sql.begin(async (tx) => {
+      const [s] = await tx<{ name: string }[]>`SELECT name FROM project_statuses WHERE id = ${status}`;
+      if (!s) throw new InputError("That status no longer exists.");
+      const changed = await tx<{ id: number }[]>`
+        UPDATE projects SET status_id = ${status}, updated_at = now()
+         WHERE id = ANY(${ids}) AND status_id <> ${status}
+        RETURNING id`;
+      for (const c of changed) {
+        await recordAudit({ user, action: "UPDATE", entity: "project", entityId: c.id, details: `Status set to ${s.name}`, tx });
+      }
+    });
+    revalidatePath("/projects");
+    return { ok: true };
+  } catch (error) {
+    return failure(error, "Those projects couldn't be updated.");
   }
 }

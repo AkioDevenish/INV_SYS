@@ -25,6 +25,7 @@ import {
   Video,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { FilterSelect } from "@/components/filter-select";
 import { Modal } from "@/components/modal";
 import { deleteCalendarEventAction, type CalendarState } from "./actions";
@@ -113,55 +114,64 @@ const TYPES: Record<
     label: "Meeting",
     shortLabel: "Meetings",
     accent: "#2563eb",
-    tint: "#e0edff",
-    border: "#a3c6fa",
-    text: "#19417d",
-    badgeBg: "bg-[#e0edff] text-[#19417d] border-[#a3c6fa]",
+    tint: "var(--cal-meeting-tint)",
+    border: "var(--cal-meeting-border)",
+    text: "var(--cal-meeting-text)",
+    badgeBg: "bg-[var(--cal-meeting-tint)] text-[var(--cal-meeting-text)] border-[var(--cal-meeting-border)]",
   },
   MISSION: {
     label: "Mission",
     shortLabel: "Missions",
     accent: "#16a34a",
-    tint: "#daf2e6",
-    border: "#8fd4b2",
-    text: "#155236",
-    badgeBg: "bg-[#daf2e6] text-[#155236] border-[#8fd4b2]",
+    tint: "var(--cal-mission-tint)",
+    border: "var(--cal-mission-border)",
+    text: "var(--cal-mission-text)",
+    badgeBg: "bg-[var(--cal-mission-tint)] text-[var(--cal-mission-text)] border-[var(--cal-mission-border)]",
   },
   LEAVE: {
     label: "Leave & Vacation",
     shortLabel: "Leave",
     accent: "#64748b",
-    tint: "#ebedf2",
-    border: "#c5cbd6",
-    text: "#374151",
-    badgeBg: "bg-[#ebedf2] text-[#374151] border-[#c5cbd6]",
+    tint: "var(--cal-leave-tint)",
+    border: "var(--cal-leave-border)",
+    text: "var(--cal-leave-text)",
+    badgeBg: "bg-[var(--cal-leave-tint)] text-[var(--cal-leave-text)] border-[var(--cal-leave-border)]",
   },
   HOLIDAY: {
     label: "Holiday",
     shortLabel: "Holidays",
     accent: "#d97706",
-    tint: "#fef0c3",
-    border: "#f5cc6a",
-    text: "#784a0e",
-    badgeBg: "bg-[#fef0c3] text-[#784a0e] border-[#f5cc6a]",
+    tint: "var(--cal-holiday-tint)",
+    border: "var(--cal-holiday-border)",
+    text: "var(--cal-holiday-text)",
+    badgeBg: "bg-[var(--cal-holiday-tint)] text-[var(--cal-holiday-text)] border-[var(--cal-holiday-border)]",
   },
   DEADLINE: {
     label: "Deadline",
     shortLabel: "Deadlines",
     accent: "#dc2626",
-    tint: "#fde2e4",
-    border: "#f4a6ad",
-    text: "#881d2a",
-    badgeBg: "bg-[#fde2e4] text-[#881d2a] border-[#f4a6ad]",
+    tint: "var(--cal-deadline-tint)",
+    border: "var(--cal-deadline-border)",
+    text: "var(--cal-deadline-text)",
+    badgeBg: "bg-[var(--cal-deadline-tint)] text-[var(--cal-deadline-text)] border-[var(--cal-deadline-border)]",
+  },
+  PROJECT: {
+    label: "Project",
+    shortLabel: "Projects",
+    accent: "#0d9488",
+    tint: "var(--cal-project-tint)",
+    border: "var(--cal-project-border)",
+    text: "var(--cal-project-text)",
+    badgeBg: "bg-[var(--cal-project-tint)] text-[var(--cal-project-text)] border-[var(--cal-project-border)]",
   },
   OTHER: {
     label: "General",
     shortLabel: "General",
     accent: "#7c3aed",
-    tint: "#ede7fb",
-    border: "#c4b2f0",
-    text: "#482d82",
-    badgeBg: "bg-[#ede7fb] text-[#482d82] border-[#c4b2f0]",
+    tint: "var(--cal-other-tint)",
+    border: "var(--cal-other-border)",
+    text: "var(--cal-other-text)",
+    badgeBg: "bg-[var(--cal-other-tint)] text-[var(--cal-other-text)] border-[var(--cal-other-border)]",
   },
 };
 
@@ -441,7 +451,10 @@ export function CalendarView({
   todayKey,
   staff = [],
   syncMeta,
+  projectLinks = {},
 }: {
+  /** Project milestones (negative ids) mapped to their project, shown read-only. */
+  projectLinks?: Record<number, number>;
   events: CalendarEventItem[];
   canManage: boolean;
   initialMonth: string;
@@ -1204,6 +1217,9 @@ export function CalendarView({
             { value: "HOLIDAY", label: "Holidays", count: countsByType.HOLIDAY ?? 0 },
             { value: "DEADLINE", label: "Deadlines", count: countsByType.DEADLINE ?? 0 },
             { value: "OTHER", label: "General", count: countsByType.OTHER ?? 0 },
+            ...(countsByType.PROJECT
+              ? [{ value: "PROJECT", label: "Projects", count: countsByType.PROJECT }]
+              : []),
           ]}
         />
 
@@ -1422,7 +1438,15 @@ export function CalendarView({
                                         <Video size={13} /> Join
                                       </a>
                                     )}
-                                    {canManage && (
+                                    {projectLinks[event.id] && (
+                                      <Link
+                                        href={`/projects/${projectLinks[event.id]}`}
+                                        className="btn btn-ghost px-2.5 py-1 text-xs text-iica-700"
+                                      >
+                                        Open project
+                                      </Link>
+                                    )}
+                                    {canManage && event.id > 0 && (
                                       <>
                                         <button
                                           type="button"
@@ -1659,7 +1683,15 @@ export function CalendarView({
                 </div>
 
                 <div className="mt-6 space-y-2 border-t border-ink/8 pt-4">
-                  {canManage && (
+                  {projectLinks[selectedEvent.id] && (
+                    <Link
+                      href={`/projects/${projectLinks[selectedEvent.id]}`}
+                      className="btn btn-primary w-full py-2 text-xs"
+                    >
+                      Open project
+                    </Link>
+                  )}
+                  {canManage && selectedEvent.id > 0 && (
                     <div className="flex items-center gap-2">
                       <button
                         type="button"

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
+import { notify } from "@/lib/notifications";
 import { assertPermission, recordAudit } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import {
@@ -52,6 +53,50 @@ function safeTaskError(error: unknown, fallback: string): string {
   return fallback;
 }
 
+const RECURRENCES = ["WEEKLY", "MONTHLY", "QUARTERLY"] as const;
+type Recurrence = (typeof RECURRENCES)[number];
+const isRecurrence = (v: string): v is Recurrence => (RECURRENCES as readonly string[]).includes(v);
+
+/**
+ * When a repeating task is completed, create its next occurrence with the
+ * dates moved on by one interval. recurrence_next_id is claimed in the same
+ * statement, so saving "complete" twice never creates two copies.
+ */
+async function spawnNextOccurrence(id: number, userId: number): Promise<void> {
+  const rows = await sql<{ id: number; title: string }[]>`
+    WITH src AS (
+      SELECT * FROM staff_tasks
+       WHERE id = ${id} AND status = 'COMPLETE' AND recurrence IS NOT NULL AND recurrence_next_id IS NULL
+       FOR UPDATE
+    ), step AS (
+      SELECT CASE recurrence WHEN 'WEEKLY' THEN interval '7 days'
+                             WHEN 'QUARTERLY' THEN interval '3 months'
+                             ELSE interval '1 month' END AS gap
+        FROM src
+    ), ins AS (
+      INSERT INTO staff_tasks (area, title, lead, origin, priority, status, progress, starts_on, ends_on,
+                               schedule_note, comments, owner_id, recurrence)
+      SELECT src.area, src.title, src.lead, src.origin, src.priority, 'NOT_STARTED',
+             CASE WHEN src.progress IS NULL THEN NULL ELSE 0 END,
+             (src.starts_on + step.gap)::date,
+             (COALESCE(src.ends_on, src.starts_on, (now() AT TIME ZONE 'America/Port_of_Spain')::date) + step.gap)::date,
+             src.schedule_note, src.comments, src.owner_id, src.recurrence
+        FROM src, step
+      RETURNING id, title
+    )
+    UPDATE staff_tasks SET recurrence_next_id = (SELECT id FROM ins)
+     WHERE id = ${id} AND EXISTS (SELECT 1 FROM ins)
+    RETURNING (SELECT id FROM ins) AS id, (SELECT title FROM ins) AS title`;
+  const next = rows[0];
+  if (next) {
+    await sql`
+      INSERT INTO audit_logs (user_id, user_label, action, entity, entity_id, details)
+      SELECT id, name || ' (' || email || ')', 'CREATE', 'staff_task', ${String(next.id)},
+             ${`Next occurrence of a repeating task · ${next.title}`}
+        FROM users WHERE id = ${userId}`;
+  }
+}
+
 export async function saveTaskAction(_prev: TaskState, fd: FormData): Promise<TaskState> {
   try {
     const user = await assertPermission("timelines.manage");
@@ -99,11 +144,12 @@ export async function saveTaskAction(_prev: TaskState, fd: FormData): Promise<Ta
       schedule_note: text(fd, "schedule_note") || null,
       owner_id: ownerId,
       comments: text(fd, "comments") || null,
+      recurrence: isRecurrence(text(fd, "recurrence").toUpperCase()) ? text(fd, "recurrence").toUpperCase() : null,
     };
 
     if (id) {
-      const [existing] = await sql<{ progress: number | null }[]>`
-        SELECT progress FROM staff_tasks WHERE id = ${id}`;
+      const [existing] = await sql<{ progress: number | null; owner_id: number | null }[]>`
+        SELECT progress, owner_id FROM staff_tasks WHERE id = ${id}`;
       if (!existing) return { error: "That task no longer exists." };
       const progressChanged = existing.progress !== values.progress;
 
@@ -115,6 +161,7 @@ export async function saveTaskAction(_prev: TaskState, fd: FormData): Promise<Ta
           owner_id = ${values.owner_id},
           ends_on = ${values.ends_on}, schedule_note = ${values.schedule_note},
           comments = ${values.comments},
+          recurrence = ${values.recurrence},
           progress_updated_at = CASE WHEN ${progressChanged} THEN now() ELSE progress_updated_at END,
           progress_updated_by = CASE WHEN ${progressChanged} THEN ${user.userId} ELSE progress_updated_by END,
           updated_at = now()
@@ -122,18 +169,37 @@ export async function saveTaskAction(_prev: TaskState, fd: FormData): Promise<Ta
         RETURNING id`;
       if (!updated) return { error: "That task no longer exists." };
       await recordAudit({ user, action: "UPDATE", entity: "staff_task", entityId: id, details: title });
+      if (values.status === "COMPLETE") await spawnNextOccurrence(id, user.userId);
+      if (values.owner_id && values.owner_id !== existing.owner_id) {
+        await notify({
+          userId: values.owner_id,
+          actorId: user.userId,
+          kind: "task_assigned",
+          title: `You're now accountable for "${title}"`,
+          body: values.ends_on ? `Due ${values.ends_on}.` : null,
+          href: `/timelines?mine=1&q=${encodeURIComponent(title.slice(0, 60))}`,
+        });
+      }
     } else {
       const hasProgress = values.progress !== null;
       const [row] = await sql<{ id: number }[]>`
         INSERT INTO staff_tasks (area, title, lead, origin, priority, status, progress,
                                  starts_on, ends_on, schedule_note, comments, owner_id,
-                                 progress_updated_at, progress_updated_by)
+                                 progress_updated_at, progress_updated_by, recurrence)
         VALUES (${values.area}, ${values.title}, ${values.lead}, ${values.origin},
                 ${values.priority}, ${values.status}, ${values.progress}, ${values.starts_on},
                 ${values.ends_on}, ${values.schedule_note}, ${values.comments}, ${values.owner_id},
-                ${hasProgress ? sql`now()` : null}, ${hasProgress ? user.userId : null})
+                ${hasProgress ? sql`now()` : null}, ${hasProgress ? user.userId : null}, ${values.recurrence})
         RETURNING id`;
       await recordAudit({ user, action: "CREATE", entity: "staff_task", entityId: row.id, details: title });
+      await notify({
+        userId: values.owner_id,
+        actorId: user.userId,
+        kind: "task_assigned",
+        title: `You're now accountable for "${title}"`,
+        body: values.ends_on ? `Due ${values.ends_on}.` : null,
+        href: `/timelines?mine=1&q=${encodeURIComponent(title.slice(0, 60))}`,
+      });
     }
 
     revalidatePath("/timelines");
@@ -215,6 +281,7 @@ export async function setTaskStatusAction(fd: FormData): Promise<TaskState> {
       entityId: id,
       details: `Status: ${status}`,
     });
+    if (status === "COMPLETE") await spawnNextOccurrence(id, user.userId);
     revalidatePath("/timelines");
     return { ok: true };
   } catch (error) {
@@ -277,6 +344,7 @@ export async function updateProgressAction(_prev: TaskState, fd: FormData): Prom
       entityId: id,
       details: `Progress ${finalProgress}% (${synced.status}) on ${task.title}${note ? ` - ${note}` : ""}`,
     });
+    if (synced.status === "COMPLETE") await spawnNextOccurrence(id, user.userId);
 
     revalidatePath("/timelines");
     return { ok: true };
@@ -380,5 +448,93 @@ export async function importTimelinesAction(_prev: TaskState, fd: FormData): Pro
     };
   } catch (error) {
     return { error: safeTaskError(error, "Could not read that workbook.") };
+  }
+}
+
+export type BulkTaskOp =
+  | { kind: "status"; status: string }
+  | { kind: "owner"; ownerId: number | null }
+  | { kind: "shift"; days: number }
+  | { kind: "delete" };
+
+/** Applies one change to many tasks in a single transaction. Managers only. */
+export async function bulkUpdateTasksAction(rawIds: number[], op: BulkTaskOp): Promise<TaskState> {
+  try {
+    const user = await assertPermission("timelines.manage");
+    const ids = [...new Set(rawIds.filter((n) => Number.isSafeInteger(n) && n > 0))].slice(0, 500);
+    if (!ids.length) return { error: "Select at least one task." };
+
+    let summary = "";
+    let completed: number[] = [];
+    await sql.begin(async (tx) => {
+      if (op.kind === "status") {
+        const status = String(op.status).toUpperCase();
+        if (!isTaskStatus(status)) throw new Error("bad-status");
+        await tx`
+          UPDATE staff_tasks
+             SET status = ${status},
+                 progress = CASE WHEN ${status} = 'COMPLETE' THEN 100
+                                 WHEN ${status} = 'NOT_STARTED' AND progress IS NOT NULL THEN 0
+                                 ELSE progress END,
+                 updated_at = now()
+           WHERE id = ANY(${ids})`;
+        summary = `Status set to ${status}`;
+        if (status === "COMPLETE") completed = ids;
+      } else if (op.kind === "owner") {
+        if (op.ownerId !== null) {
+          const [owner] = await tx<{ status: string }[]>`SELECT status FROM users WHERE id = ${op.ownerId}`;
+          if (!owner || owner.status !== "ACTIVE") throw new Error("bad-owner");
+        }
+        const changed = await tx<{ id: number; title: string }[]>`
+          UPDATE staff_tasks SET owner_id = ${op.ownerId}, updated_at = now()
+           WHERE id = ANY(${ids}) AND owner_id IS DISTINCT FROM ${op.ownerId}
+          RETURNING id, title`;
+        summary = op.ownerId ? "Accountable person changed" : "Accountable person cleared";
+        if (op.ownerId && changed.length) {
+          await notify(
+            {
+              userId: op.ownerId,
+              actorId: user.userId,
+              kind: "task_assigned",
+              title:
+                changed.length === 1
+                  ? `You're now accountable for "${changed[0].title}"`
+                  : `You're now accountable for ${changed.length} tasks`,
+              href: "/timelines?mine=1",
+            },
+            tx,
+          );
+        }
+      } else if (op.kind === "shift") {
+        const days = Math.trunc(Number(op.days));
+        if (!Number.isFinite(days) || days === 0 || Math.abs(days) > 366) throw new Error("bad-shift");
+        await tx`
+          UPDATE staff_tasks
+             SET starts_on = starts_on + ${days}::int, ends_on = ends_on + ${days}::int, updated_at = now()
+           WHERE id = ANY(${ids})`;
+        summary = `Dates moved ${days > 0 ? "forward" : "back"} ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"}`;
+      } else {
+        await tx`DELETE FROM staff_tasks WHERE id = ANY(${ids})`;
+        summary = "Deleted";
+      }
+      await recordAudit({
+        user,
+        action: op.kind === "delete" ? "DELETE" : "UPDATE",
+        entity: "staff_task",
+        details: `${summary} on ${ids.length} task${ids.length === 1 ? "" : "s"}`,
+        tx,
+      });
+    });
+
+    for (const id of completed) await spawnNextOccurrence(id, user.userId);
+    revalidatePath("/timelines");
+    revalidatePath("/calendar");
+    return { ok: true, message: `${summary} on ${ids.length} task${ids.length === 1 ? "" : "s"}.` };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "";
+    if (msg === "bad-status") return { error: "Choose a valid status." };
+    if (msg === "bad-owner") return { error: "That person can't be assigned." };
+    if (msg === "bad-shift") return { error: "Choose how many days to move the dates." };
+    return { error: safeTaskError(error, "Those tasks couldn't be updated.") };
   }
 }

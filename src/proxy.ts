@@ -14,7 +14,8 @@ export function proxy(request: NextRequest) {
     // Inline style attributes (D3 charts, progress bars, FullCalendar) rely on 'unsafe-inline'.
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data:",
-    "font-src 'self'",
+    // FullCalendar ships its small icon font inline as a data: URI.
+    "font-src 'self' data:",
     "connect-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",

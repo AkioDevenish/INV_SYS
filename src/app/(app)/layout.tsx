@@ -1,6 +1,8 @@
 import { requireUser } from "@/lib/auth";
 import { getPermissionMatrix } from "@/lib/permissions";
 import { AppShell } from "@/components/app-shell";
+import { cookies } from "next/headers";
+import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 import { NAV_SECTIONS, canViewNavItem } from "@/components/nav-config";
 import { logoutAction } from "../(auth)/login/actions";
 
@@ -19,6 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       sections={sections}
       user={{ name: user.name, role: user.role }}
       logout={logoutAction}
+      theme={parseTheme((await cookies()).get(THEME_COOKIE)?.value)}
     >
       {children}
     </AppShell>

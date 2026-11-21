@@ -25,6 +25,66 @@ export const SCHEMA_SQL = `
   ALTER TABLE users
     ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 1;
 
+  /* Weekly reminder emails are on unless the person turns them off. */
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS reminders_enabled BOOLEAN NOT NULL DEFAULT true;
+  /* Entra ID object id, recorded the first time someone signs in with
+     Microsoft, so a later email change in the directory can't hand the
+     account to somebody else. */
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS microsoft_oid TEXT;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_users_microsoft_oid ON users (microsoft_oid) WHERE microsoft_oid IS NOT NULL;
+
+  /* One row per reminder email attempt. A successful send in the last six
+     days stops a second one, so a retried or doubled cron run is harmless. */
+  CREATE TABLE IF NOT EXISTS reminder_log (
+    id         SERIAL PRIMARY KEY,
+    user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    sent_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    item_count INTEGER NOT NULL DEFAULT 0,
+    status     TEXT NOT NULL,
+    error      TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_reminder_log_user ON reminder_log (user_id, sent_at DESC);
+
+  /* In-app notifications. dedupe_key stops the same alert (for example
+     "task 12 is overdue as of 2026-11-30") being raised twice. */
+  CREATE TABLE IF NOT EXISTS notifications (
+    id         SERIAL PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind       TEXT NOT NULL,
+    title      TEXT NOT NULL,
+    body       TEXT,
+    href       TEXT,
+    actor_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    dedupe_key TEXT,
+    read_at    TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, created_at DESC);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedupe ON notifications (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
+
+  /* Discussion threads on projects and timeline tasks. */
+  CREATE TABLE IF NOT EXISTS comments (
+    id          SERIAL PRIMARY KEY,
+    entity_type TEXT NOT NULL CHECK (entity_type IN ('project', 'task')),
+    entity_id   INTEGER NOT NULL,
+    author_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    body        TEXT NOT NULL,
+    edited_at   TIMESTAMPTZ,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE INDEX IF NOT EXISTS idx_comments_entity ON comments (entity_type, entity_id, created_at);
+
+  /* A person's saved filter combinations for a list page. */
+  CREATE TABLE IF NOT EXISTS saved_views (
+    id         SERIAL PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    page       TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    query      TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_saved_views_name ON saved_views (user_id, page, lower(name));
+
   /*
    * Which role may do what. Seeded from the defaults in roles.ts by
    * getPermissionMatrix() / seed.mjs, and editable from Users & access after
@@ -281,6 +341,9 @@ export const SCHEMA_SQL = `
   ALTER TABLE staff_tasks ADD COLUMN IF NOT EXISTS progress_note TEXT;
   ALTER TABLE staff_tasks ADD COLUMN IF NOT EXISTS progress_updated_at TIMESTAMPTZ;
   ALTER TABLE staff_tasks ADD COLUMN IF NOT EXISTS progress_updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+  /* Tasks that repeat: completing one creates the next occurrence. */
+  ALTER TABLE staff_tasks ADD COLUMN IF NOT EXISTS recurrence TEXT;
+  ALTER TABLE staff_tasks ADD COLUMN IF NOT EXISTS recurrence_next_id INTEGER;
 
   CREATE TABLE IF NOT EXISTS audit_logs (
     id         SERIAL PRIMARY KEY,
@@ -638,6 +701,18 @@ export const SCHEMA_SQL = `
     created_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT chk_document_resources_state CHECK (approval_state IN ('DRAFT', 'FINAL'))
+  );
+
+  /* Files uploaded straight into the app, kept with their document record.
+     Size is capped in the upload action (hosting limits request bodies). */
+  CREATE TABLE IF NOT EXISTS project_files (
+    resource_id INTEGER PRIMARY KEY REFERENCES document_resources(id) ON DELETE CASCADE,
+    filename    TEXT NOT NULL,
+    mime_type   TEXT NOT NULL,
+    size_bytes  INTEGER NOT NULL,
+    data        BYTEA NOT NULL,
+    uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
   );
 
   CREATE TABLE IF NOT EXISTS project_documents (

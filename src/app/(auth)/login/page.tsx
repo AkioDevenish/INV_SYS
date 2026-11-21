@@ -6,6 +6,29 @@ import { needsSetup } from "@/lib/setup";
 import { BrandLockup } from "@/components/brand";
 import { ORG_SHORT } from "@/lib/brand";
 import { LoginForm } from "./login-form";
+import { isMicrosoftSignInEnabled } from "@/lib/microsoft";
+
+const MICROSOFT_ERRORS: Record<string, string> = {
+  microsoft_off: "Microsoft sign-in isn't set up on this server yet. Use your password.",
+  microsoft_cancelled: "Microsoft sign-in was cancelled.",
+  microsoft_expired: "That sign-in took too long or was opened in another tab. Please try again.",
+  microsoft_failed: "Microsoft sign-in didn't complete. Please try again, or use your password.",
+  microsoft_no_account:
+    "Your Microsoft account isn't linked to an account here. Ask an administrator to add you using your work email.",
+  microsoft_disabled: "This account has been disabled. Contact an administrator.",
+};
+
+/** The four-square Microsoft mark, drawn inline so the CSP never has to allow an outside image. */
+function MicrosoftLogo() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 21 21" aria-hidden="true">
+      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+    </svg>
+  );
+}
 
 export const metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
@@ -31,13 +54,16 @@ const highlights = [
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ next?: string | string[] }>;
+  searchParams?: Promise<{ next?: string | string[]; error?: string | string[] }>;
 }) {
   if (await needsSetup()) redirect("/setup");
 
   const resolvedParams = searchParams ? await searchParams : {};
   const rawNext = Array.isArray(resolvedParams.next) ? resolvedParams.next[0] : resolvedParams.next;
   const nextPath = sanitizeNextPath(rawNext);
+  const rawError = Array.isArray(resolvedParams.error) ? resolvedParams.error[0] : resolvedParams.error;
+  const microsoftError = rawError ? MICROSOFT_ERRORS[rawError] : undefined;
+  const microsoftEnabled = isMicrosoftSignInEnabled();
 
   const user = await getCurrentUser();
   if (user) {
@@ -89,7 +115,33 @@ export default async function LoginPage({
             Use the account issued to you by your {ORG_SHORT} administrator.
           </p>
 
-          <div className="mt-7">
+          {microsoftError && (
+            <div
+              role="alert"
+              className="mt-6 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-700"
+            >
+              {microsoftError}
+            </div>
+          )}
+
+          {microsoftEnabled && (
+            <>
+              <a
+                href={`/api/auth/microsoft/start${nextPath ? `?next=${encodeURIComponent(nextPath)}` : ""}`}
+                className="mt-7 flex w-full items-center justify-center gap-2.5 rounded-xl border border-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-ink shadow-xs transition hover:border-iica-300 hover:bg-iica-50/40"
+              >
+                <MicrosoftLogo />
+                Sign in with Microsoft
+              </a>
+              <div className="my-5 flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.12em] text-ink/40">
+                <span className="h-px flex-1 bg-ink/10" />
+                or use a password
+                <span className="h-px flex-1 bg-ink/10" />
+              </div>
+            </>
+          )}
+
+          <div className={microsoftEnabled ? "" : "mt-7"}>
             <LoginForm nextPath={nextPath ?? undefined} />
           </div>
 

@@ -974,6 +974,7 @@ export type StaffTask = {
   progress_note: string | null;
   progress_updated_at: Date | null;
   progress_updated_by_name: string | null;
+  recurrence: string | null;
 };
 
 export type TaskFilters = {
@@ -1022,7 +1023,7 @@ export async function listStaffTasks(filters: TaskFilters = {}): Promise<StaffTa
   return sql.unsafe<StaffTask[]>(
     `SELECT t.id, t.area, t.position, t.title, t.lead, t.origin, t.priority, t.status,
             t.progress, t.starts_on, t.ends_on, t.schedule_note, t.comments,
-            t.owner_id, o.name AS owner_name, t.progress_note, t.progress_updated_at,
+            t.owner_id, o.name AS owner_name, t.progress_note, t.progress_updated_at, t.recurrence,
             p.name AS progress_updated_by_name
        FROM staff_tasks t
        LEFT JOIN users o ON o.id = t.owner_id

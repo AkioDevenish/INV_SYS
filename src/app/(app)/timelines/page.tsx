@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { requirePermission } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { listStaffTasks, listUsers } from "@/lib/queries";
+import { listProjectActionsForTimelines } from "@/lib/projects";
+import { PROJECT_AREA } from "@/lib/timelines";
 import { PageHeader } from "@/components/ui";
 import { ImportTimelinesButton, NewTaskButton, type OwnerOption } from "./task-forms";
 import { TimelinesView, type TimelineTask } from "./timelines-view";
@@ -19,11 +21,14 @@ function astTodayKey(): string {
 
 export default async function TimelinesPage({ searchParams }: { searchParams: Search }) {
   const user = await requirePermission("timelines.view");
-  const [canManage, tasks, params] = await Promise.all([
+  const [canManage, canSeeProjects, tasks, params] = await Promise.all([
     can(user.role, "timelines.manage"),
+    can(user.role, "projects.view"),
     listStaffTasks(),
     searchParams,
   ]);
+  // Project follow-up actions show here read-only; they are edited on the project.
+  const projectActions = canSeeProjects ? await listProjectActionsForTimelines() : [];
   const staff = canManage ? await listUsers() : [];
 
   const activeOwners: OwnerOption[] = staff
@@ -34,8 +39,10 @@ export default async function TimelinesPage({ searchParams }: { searchParams: Se
     .map((u) => ({ id: u.id, name: u.name, disabled: true }));
 
   const areaNames = [...new Set(tasks.map((t) => t.area))].sort();
+  const viewAreas = projectActions.length ? [...areaNames, PROJECT_AREA] : areaNames;
   const requestedArea = one(params.area);
-  const activeArea = requestedArea && areaNames.includes(requestedArea) ? requestedArea : undefined;
+  const activeArea =
+    requestedArea && areaNames.includes(requestedArea) ? requestedArea : undefined;
 
   const serialized: TimelineTask[] = tasks.map((t) => ({
     id: t.id,
@@ -57,6 +64,35 @@ export default async function TimelinesPage({ searchParams }: { searchParams: Se
       ? t.progress_updated_at.toLocaleDateString("en-CA", { timeZone: "America/Port_of_Spain" })
       : null,
     progress_updated_by_name: t.progress_updated_by_name,
+    recurrence: t.recurrence,
+    project: null,
+  }));
+
+  const ACTION_STATUS: Record<string, string> = {
+    OPEN: "NOT_STARTED",
+    IN_PROGRESS: "ONGOING",
+    DONE: "COMPLETE",
+  };
+  const fromProjects: TimelineTask[] = projectActions.map((a) => ({
+    // Negative ids keep these apart from real timeline rows.
+    id: -a.id,
+    area: PROJECT_AREA,
+    title: a.description,
+    lead: null,
+    origin: a.project_code ? `${a.project_code} · ${a.project_title}` : a.project_title,
+    priority: "",
+    status: ACTION_STATUS[a.state] ?? "NOT_STARTED",
+    progress: null,
+    starts_on: null,
+    ends_on: a.due_date,
+    schedule_note: null,
+    comments: null,
+    owner_id: a.assigned_user_id,
+    owner_name: a.assigned_name,
+    progress_note: null,
+    progress_updated_at: a.completed_on,
+    progress_updated_by_name: null,
+    project: { id: a.project_id, title: a.project_title },
   }));
 
   return (
@@ -77,8 +113,8 @@ export default async function TimelinesPage({ searchParams }: { searchParams: Se
 
       <Suspense fallback={<div className="panel h-96 animate-pulse" />}>
         <TimelinesView
-          tasks={serialized}
-          areaNames={areaNames}
+          tasks={[...serialized, ...fromProjects]}
+          areaNames={viewAreas}
           canManage={canManage}
           userId={user.userId}
           owners={activeOwners}

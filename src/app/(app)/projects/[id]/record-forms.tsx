@@ -2,8 +2,8 @@
 
 import { FilterSelect } from "@/components/filter-select";
 
-import { useState, useTransition } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { Check, Loader2, UploadCloud } from "lucide-react";
 import type {
   ActionRow,
   DocumentRow,
@@ -357,6 +357,7 @@ export function DocumentForm({
   onDone: Done;
 }) {
   const [mode, setMode] = useState<"new" | "link">("new");
+  const [file, setFile] = useState<File | null>(null);
   const canLink = !row && existing.length > 0;
   return (
     <ActionForm
@@ -401,10 +402,15 @@ export function DocumentForm({
         </Field>
       ) : (
         <>
-          <Field label="Title">
-            {(id) => <input id={id} name="title" className="field" defaultValue={row?.title ?? ""} required />}
+          <FileDrop
+            file={file}
+            onChange={setFile}
+            existing={row?.file_name ? `${row.file_name} · ${formatBytes(row.file_size ?? 0)}` : null}
+          />
+          <Field label="Title" hint={file && !row ? "Leave blank to use the file name." : undefined}>
+            {(id) => <input id={id} name="title" className="field" defaultValue={row?.title ?? ""} required={!file} />}
           </Field>
-          <Field label="Link" hint="SharePoint, OneDrive or any web address where the file lives.">
+          <Field label="Or a link" hint="SharePoint, OneDrive or any web address, for files kept elsewhere.">
             {(id) => <input id={id} name="url" type="url" className="field" defaultValue={row?.url ?? ""} placeholder="https://" />}
           </Field>
           <div className="grid gap-3 sm:grid-cols-3">
@@ -441,6 +447,100 @@ export function DocumentForm({
         {(id) => <input id={id} name="link_purpose" className="field" defaultValue={row?.link_purpose ?? ""} maxLength={100} />}
       </Field>
     </ActionForm>
+  );
+}
+
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const MAX_FILE = 4 * 1024 * 1024;
+
+/** Drag a file in, or click to choose. Submits as "file"; capped at 4 MB. */
+function FileDrop({
+  file,
+  onChange,
+  existing,
+}: {
+  file: File | null;
+  onChange: (f: File | null) => void;
+  existing: string | null;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+  const tooBig = file ? file.size > MAX_FILE : false;
+
+  const take = (f: File | undefined) => {
+    if (!f || !inputRef.current) return;
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    inputRef.current.files = dt.files;
+    onChange(f);
+  };
+
+  return (
+    <div>
+      <div className="label">File</div>
+      <label
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          take(e.dataTransfer.files?.[0]);
+        }}
+        className={`flex cursor-pointer items-center gap-3 rounded-xl border border-dashed px-4 py-3.5 transition ${
+          over ? "border-iica-600 bg-iica-50" : "border-ink/20 bg-white hover:border-iica-300 hover:bg-iica-50/40"
+        }`}
+      >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-iica-50 text-iica-700">
+          <UploadCloud size={17} aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1 text-sm">
+          {file ? (
+            <>
+              <span className="block truncate font-medium text-ink">{file.name}</span>
+              <span className={`text-xs ${tooBig ? "font-semibold text-rose-700" : "text-ink/55"}`}>
+                {formatBytes(file.size)}
+                {tooBig ? " · too large, the limit is 4 MB" : ""}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="block font-medium text-ink">
+                {existing ? "Replace the uploaded file" : "Drop a file here, or click to choose"}
+              </span>
+              <span className="text-xs text-ink/55">{existing ? `Current: ${existing}` : "Up to 4 MB. PDFs, Office files, images…"}</span>
+            </>
+          )}
+        </span>
+        {file && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              if (inputRef.current) inputRef.current.value = "";
+              onChange(null);
+            }}
+            className="rounded-lg px-2 py-1 text-xs font-medium text-ink/55 hover:bg-ink/5 hover:text-ink"
+          >
+            Remove
+          </button>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          name="file"
+          className="sr-only"
+          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+        />
+      </label>
+    </div>
   );
 }
 

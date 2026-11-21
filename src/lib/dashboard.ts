@@ -9,6 +9,9 @@ export type DashboardFocus = "all" | "inventory" | "operations" | "directory";
 
 export const PANELS = {
   stats: { title: "Key figures", span: 12, focus: "all" as const },
+  myWeek: { title: "My week", span: 6, focus: "operations" as const },
+  projectRisk: { title: "Projects needing attention", span: 6, focus: "operations" as const },
+  projectFunding: { title: "Project funding", span: 6, focus: "operations" as const },
   chart: { title: "Movement volume", span: 8, focus: "inventory" as const },
   category: { title: "Stock by category", span: 4, focus: "inventory" as const },
   agenda: { title: "Upcoming schedule", span: 6, focus: "operations" as const },
@@ -28,10 +31,13 @@ export type PanelId = keyof typeof PANELS;
 /** The arrangement everyone starts from. */
 export const DEFAULT_ORDER: PanelId[] = [
   "stats",
+  "myWeek",
+  "projectRisk",
   "chart",
   "category",
   "agenda",
   "operations",
+  "projectFunding",
   "health",
   "location",
   "attention",

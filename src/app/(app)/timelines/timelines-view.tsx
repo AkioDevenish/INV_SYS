@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -19,9 +20,15 @@ import {
   User,
   UserCheck,
   X,
+  ArrowUpRight,
+  MessagesSquare,
+  Repeat,
 } from "lucide-react";
+import { CommentThread } from "@/components/comment-thread";
+import { BulkBar } from "./bulk-bar";
 import { EmptyState } from "@/components/ui";
 import { FilterSelect } from "@/components/filter-select";
+import { SavedViews } from "@/components/saved-views";
 import { Pagination } from "@/components/pagination";
 import { RowActions } from "@/components/icon-button";
 import {
@@ -29,6 +36,7 @@ import {
   PRIORITY_META,
   STATUS_META,
   TASK_STATUSES,
+  PROJECT_AREA,
   areaLabel,
   isPriority,
   type Priority,
@@ -51,11 +59,14 @@ export type TimelineTask = {
   ends_on: string | null;
   schedule_note: string | null;
   comments: string | null;
+  recurrence?: string | null;
   owner_id: number | null;
   owner_name: string | null;
   progress_note: string | null;
   progress_updated_at: string | null;
   progress_updated_by_name: string | null;
+  /** Set when the row is a project follow-up action shown here read-only. */
+  project: { id: number; title: string } | null;
 };
 
 type ViewMode = "table" | "board" | "schedule";
@@ -150,6 +161,20 @@ function DueBadge({ state }: { state: DueState }) {
     >
       {overdue && <AlertTriangle size={10} aria-hidden="true" />}
       {dueText(state)}
+    </span>
+  );
+}
+
+const REPEAT_LABEL: Record<string, string> = { WEEKLY: "Weekly", MONTHLY: "Monthly", QUARTERLY: "Quarterly" };
+
+function RepeatBadge({ recurrence }: { recurrence?: string | null }) {
+  if (!recurrence || !REPEAT_LABEL[recurrence]) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-800"
+      title="Completing this task creates the next one"
+    >
+      <Repeat size={10} aria-hidden="true" /> {REPEAT_LABEL[recurrence]}
     </span>
   );
 }
@@ -278,6 +303,15 @@ export function TimelinesView({
   }, [searchInput, urlQ, updateUrl, cancelSearchTimer]);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Ticked rows for bulk changes (managers only; project actions can't be ticked).
+  const [ticked, setTicked] = useState<Set<number>>(new Set());
+  const toggleTick = (id: number) =>
+    setTicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const asideRef = useRef<HTMLElement | null>(null);
 
   const selectTask = (id: number) => {
@@ -411,12 +445,22 @@ export function TimelinesView({
     ends_on: t.ends_on,
     schedule_note: t.schedule_note,
     comments: t.comments,
+    recurrence: t.recurrence ?? null,
   });
 
-  const canUpdate = (t: TimelineTask) => canManage || t.owner_id === userId;
+  const formAreas = areaNames.filter((a) => a !== PROJECT_AREA);
+  const canUpdate = (t: TimelineTask) => !t.project && (canManage || t.owner_id === userId);
+  const canChangeStatus = (t: TimelineTask) => canManage && !t.project;
 
   const taskActions = (t: TimelineTask) =>
-    canUpdate(t) ? (
+    t.project ? (
+      <Link
+        href={`/projects/${t.project.id}?tab=actions`}
+        className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-xs font-semibold text-iica-700 hover:bg-iica-50"
+      >
+        Open project <ArrowUpRight size={12} aria-hidden="true" />
+      </Link>
+    ) : canUpdate(t) ? (
       <RowActions>
         <UpdateProgressButton
           id={t.id}
@@ -426,7 +470,7 @@ export function TimelinesView({
           status={t.status}
           owned={t.owner_id === userId}
         />
-        {canManage && <EditTaskButton task={toRow(t)} areas={areaNames} owners={ownersFor(t.owner_id)} />}
+        {canManage && <EditTaskButton task={toRow(t)} areas={formAreas} owners={ownersFor(t.owner_id)} />}
         {canManage && <DeleteTaskButton id={t.id} title={t.title} />}
       </RowActions>
     ) : null;
@@ -448,6 +492,8 @@ export function TimelinesView({
     .join(" · ");
 
   const transitionKey = `${viewMode}-${areaFilter ?? "all"}-${statusFilter}-${priorityFilter}-${leadFilter}-${mine}-${safePage}-${scheduleYear}`;
+  // A filter change can hide ticked rows, so ticks never outlive the view they were made in.
+  useEffect(() => setTicked(new Set()), [transitionKey]);
 
   const emptyState = (
     <EmptyState
@@ -561,6 +607,7 @@ export function TimelinesView({
             options={[{ value: "", label: "Every lead" }, ...leadOptions.map((l) => ({ value: l, label: l }))]}
           />
 
+          <SavedViews page="timelines" />
           {hasActiveFilters && (
             <button
               type="button"
@@ -653,6 +700,7 @@ export function TimelinesView({
                           <StatusChip status={t.status} />
                           <PriorityChip priority={t.priority} />
                           <DueBadge state={due} />
+                          <RepeatBadge recurrence={t.recurrence} />
                         </div>
                         <div className="mt-1.5 text-sm font-semibold text-ink">{t.title}</div>
                         <div className="mt-0.5 text-xs text-ink/60">
@@ -666,14 +714,30 @@ export function TimelinesView({
                           <ProgressBar progress={t.progress} note={t.progress_note} />
                         </div>
                       )}
-                      {canUpdate(t) && <div className="mt-1.5">{taskActions(t)}</div>}
+                      {(canUpdate(t) || t.project) && <div className="mt-1.5">{taskActions(t)}</div>}
                     </li>
                   );
                 })}
               </ul>
+              {canManage && ticked.size > 0 && (
+                <BulkBar ids={[...ticked]} owners={owners} onDone={() => setTicked(new Set())} />
+              )}
               <table className="table-shell hidden w-full md:table [&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-3.5">
                 <thead>
                   <tr>
+                    {canManage && (
+                      <th className="w-10 !pr-0">
+                        <input
+                          type="checkbox"
+                          aria-label="Select every task on this page"
+                          className="h-4 w-4 rounded border-ink/30 accent-iica-700"
+                          checked={pageTasks.some((t) => !t.project) && pageTasks.filter((t) => !t.project).every((t) => ticked.has(t.id))}
+                          onChange={(e) =>
+                            setTicked(e.target.checked ? new Set(pageTasks.filter((t) => !t.project).map((t) => t.id)) : new Set())
+                          }
+                        />
+                      </th>
+                    )}
                     <th>Task</th>
                     <th>Lead</th>
                     <th>When</th>
@@ -690,7 +754,20 @@ export function TimelinesView({
                     const due = dueState(t, todayKey);
                     const isSelected = selected?.id === t.id;
                     return (
-                      <tr key={t.id} className={isSelected ? "bg-iica-50/75" : ""}>
+                      <tr key={t.id} className={isSelected || ticked.has(t.id) ? "bg-iica-50/75" : ""}>
+                        {canManage && (
+                          <td className="w-10 !pr-0">
+                            {!t.project && (
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${t.title}`}
+                                className="h-4 w-4 rounded border-ink/30 accent-iica-700"
+                                checked={ticked.has(t.id)}
+                                onChange={() => toggleTick(t.id)}
+                              />
+                            )}
+                          </td>
+                        )}
                         <td className="min-w-[14rem]">
                           <button
                             type="button"
@@ -699,13 +776,16 @@ export function TimelinesView({
                           >
                             {t.title}
                           </button>
-                          {!areaFilter && (
-                            <div className="mt-1">
-                              <span
-                                className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${areaTone(t.area)}`}
-                              >
-                                {areaLabel(t.area)}
-                              </span>
+                          {(!areaFilter || t.recurrence) && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {!areaFilter && (
+                                <span
+                                  className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${areaTone(t.area)}`}
+                                >
+                                  {areaLabel(t.area)}
+                                </span>
+                              )}
+                              <RepeatBadge recurrence={t.recurrence} />
                             </div>
                           )}
                         </td>
@@ -739,7 +819,7 @@ export function TimelinesView({
                           />
                         </td>
                         <td>
-                          {canManage ? (
+                          {canChangeStatus(t) ? (
                             <StatusPicker id={t.id} title={t.title} status={t.status} progress={t.progress} />
                           ) : (
                             <StatusChip status={t.status} />
@@ -813,6 +893,7 @@ export function TimelinesView({
                                 )}
                                 <PriorityChip priority={t.priority} />
                                 <DueBadge state={due} />
+                                <RepeatBadge recurrence={t.recurrence} />
                               </div>
                               <div className="mt-2 text-sm font-semibold leading-snug text-ink">{t.title}</div>
                               <div className="mt-2 space-y-1 text-[11px] text-ink/60">
@@ -896,7 +977,7 @@ export function TimelinesView({
               thisYear={thisYear}
               todayKey={todayKey}
               areaTone={areaTone(selected.area)}
-              canManage={canManage}
+              canManage={canManage && !selected.project}
               actions={taskActions(selected)}
               onClose={() => setSelectedId(null)}
             />
@@ -993,6 +1074,7 @@ function TaskInspector({
             </span>
             <PriorityChip priority={t.priority} />
             <DueBadge state={due} />
+            <RepeatBadge recurrence={t.recurrence} />
           </div>
           <h3 className="mt-2 text-base font-semibold leading-snug text-ink">{t.title}</h3>
         </div>
@@ -1035,7 +1117,7 @@ function TaskInspector({
           <div className="flex items-start gap-2.5 border-t border-ink/6 pt-2.5">
             <Compass size={15} className="mt-0.5 shrink-0 text-iica-700" aria-hidden="true" />
             <div>
-              <div className="text-ink/55">Origin</div>
+              <div className="text-ink/55">{t.project ? "Project" : "Origin"}</div>
               <div className="font-medium text-ink">{t.origin}</div>
             </div>
           </div>
@@ -1068,6 +1150,15 @@ function TaskInspector({
             <MessageSquareText size={13} className="text-iica-700" aria-hidden="true" /> Comments
           </div>
           <p className="whitespace-pre-line text-xs leading-relaxed text-ink/75">{t.comments}</p>
+        </div>
+      )}
+
+      {!t.project && (
+        <div className="border-t border-ink/8 pt-3">
+          <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-ink">
+            <MessagesSquare size={13} className="text-iica-700" aria-hidden="true" /> Discussion
+          </div>
+          <CommentThread type="task" id={t.id} compact />
         </div>
       )}
 

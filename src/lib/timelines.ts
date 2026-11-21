@@ -60,9 +60,13 @@ export function isPriority(value: string): value is Priority {
  * Areas come from the workbook's sheet names, so a new sheet needs no code
  * change. These are the ones we know, and anything else shows as its own name.
  */
+/** Follow-up actions read from Projects appear under this area, read-only. */
+export const PROJECT_AREA = "PROJECTS";
+
 const AREA_LABELS: Record<string, string> = {
   TC: "Technical cooperation",
   ADMIN: "Administration",
+  [PROJECT_AREA]: "Project actions",
 };
 
 export function areaLabel(area: string): string {

@@ -30,6 +30,7 @@ export type TaskRow = {
   ends_on: string | null;
   schedule_note: string | null;
   comments: string | null;
+  recurrence?: string | null;
 };
 
 export type OwnerOption = { id: number; name: string; disabled?: boolean };
@@ -274,6 +275,26 @@ function TaskForm({
           onChange={(e) => setScheduleNote(e.target.value)}
           placeholder="9am-1pm, All day, Sep 26 · Oct 26…"
         />
+      </div>
+
+      <div>
+        <label className="label" htmlFor={`${uid}-recurrence`}>
+          Repeats
+        </label>
+        <select
+          id={`${uid}-recurrence`}
+          name="recurrence"
+          className="field"
+          defaultValue={task?.recurrence ?? ""}
+        >
+          <option value="">Doesn&apos;t repeat</option>
+          <option value="WEEKLY">Every week</option>
+          <option value="MONTHLY">Every month</option>
+          <option value="QUARTERLY">Every quarter</option>
+        </select>
+        <p className="mt-1.5 text-xs text-ink/55">
+          Marking a repeating task complete creates the next one with its dates moved on.
+        </p>
       </div>
 
       <div>

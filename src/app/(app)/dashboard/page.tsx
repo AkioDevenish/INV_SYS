@@ -35,6 +35,9 @@ import {
   stockByLocation,
 } from "@/lib/queries";
 import { listProjects } from "@/lib/projects";
+import { getProjectReport, listProjectsAtRisk } from "@/lib/project-reports";
+import { getDigestFor } from "@/lib/reminders";
+import { MyWeekPanel, ProjectFundingPanel, ProjectRiskPanel } from "./project-panels";
 import { listVendorsWithStats } from "@/lib/vendors";
 import {
   VENDOR_GROUP_ORDER,
@@ -162,6 +165,12 @@ export default async function DashboardPage() {
   ) {
     redirect("/denied?permission=inventory.view");
   }
+
+  const [myDigest, projectsAtRisk, projectReport] = await Promise.all([
+    showTimelines || showProjects ? getDigestFor(user.userId) : Promise.resolve(null),
+    showProjects ? listProjectsAtRisk() : Promise.resolve([]),
+    showProjects && showReports ? getProjectReport() : Promise.resolve(null),
+  ]);
 
   const now = new Date();
   const todayKey = astDayKey(now);
@@ -539,6 +548,12 @@ export default async function DashboardPage() {
       <DashboardGrid
         initialLayout={layout}
         panels={{
+          myWeek: showTimelines || showProjects ? <MyWeekPanel digest={myDigest} /> : undefined,
+          projectRisk: showProjects ? <ProjectRiskPanel projects={projectsAtRisk} /> : undefined,
+          projectFunding:
+            showProjects && showReports && projectReport && projectReport.funding.length > 0 ? (
+              <ProjectFundingPanel funding={projectReport.funding} />
+            ) : undefined,
           stats:
             kpiCards.length > 0 ? (
               <div className={`grid grid-cols-2 gap-3 ${statGridCols}`}>

@@ -355,6 +355,9 @@ export type DocumentRow = {
   registered_on: string;
   link_purpose: string | null;
   other_projects: number;
+  /** Set when a file was uploaded into the app rather than linked. */
+  file_name: string | null;
+  file_size: number | null;
 };
 
 export type ProjectLesson = {
@@ -491,9 +494,11 @@ export const getProject = cache(async (id: number): Promise<ProjectDetail | null
     sql<DocumentRow[]>`
       SELECT r.id AS resource_id, r.title, r.resource_type, r.url, r.version_label, r.approval_state,
              to_char(r.registered_on, 'YYYY-MM-DD') AS registered_on, d.link_purpose,
-             COALESCE(oc.other_projects, 0)::int AS other_projects
+             COALESCE(oc.other_projects, 0)::int AS other_projects,
+             pf.filename AS file_name, pf.size_bytes AS file_size
         FROM project_documents d
         JOIN document_resources r ON r.id = d.resource_id
+        LEFT JOIN project_files pf ON pf.resource_id = r.id
         LEFT JOIN (
           SELECT resource_id, COUNT(*)::int AS other_projects
             FROM project_documents
@@ -669,3 +674,124 @@ export const listProjectsForStakeholder = cache(
     return { projects, funding };
   },
 );
+
+/* ---------- read-only views of projects inside Timelines and Calendar ---------- */
+
+export type ProjectActionForTimeline = {
+  id: number;
+  project_id: number;
+  project_code: string | null;
+  project_title: string;
+  description: string;
+  assigned_user_id: number | null;
+  assigned_name: string | null;
+  due_date: string | null;
+  state: string;
+  completed_on: string | null;
+  created_on: string;
+};
+
+/**
+ * Follow-up actions from every project, so Timelines shows one list of what
+ * the office owes. They stay owned by the project: Timelines reads them and
+ * links back rather than copying them.
+ */
+export const listProjectActionsForTimelines = cache(async (): Promise<ProjectActionForTimeline[]> => {
+  await ensureSchema();
+  return sql<ProjectActionForTimeline[]>`
+    SELECT a.id, a.project_id, p.code AS project_code, p.title AS project_title, a.description,
+           a.assigned_user_id, u.name AS assigned_name,
+           to_char(a.due_date, 'YYYY-MM-DD') AS due_date, a.state,
+           to_char(a.completed_on, 'YYYY-MM-DD') AS completed_on,
+           to_char(a.created_at AT TIME ZONE 'America/Port_of_Spain', 'YYYY-MM-DD') AS created_on
+      FROM project_actions a
+      JOIN projects p ON p.id = a.project_id
+      LEFT JOIN users u ON u.id = a.assigned_user_id
+     WHERE a.state <> 'CANCELLED'
+     ORDER BY a.due_date NULLS LAST, a.id`;
+});
+
+export type ProjectCalendarItem = {
+  key: string;
+  project_id: number;
+  date: string;
+  title: string;
+  description: string;
+};
+
+/**
+ * Project milestones for the Calendar: start, target end, actual end and the
+ * due date of every open follow-up action.
+ */
+export const listProjectCalendarItems = cache(async (): Promise<ProjectCalendarItem[]> => {
+  await ensureSchema();
+  const rows = await sql<
+    {
+      project_id: number;
+      label: string;
+      kind: "start" | "target" | "end" | "action";
+      date: string;
+      detail: string | null;
+      ref_id: number;
+    }[]
+  >`
+    SELECT p.id AS project_id, COALESCE(p.code || ' · ', '') || p.title AS label, 'start' AS kind,
+           to_char(p.start_date, 'YYYY-MM-DD') AS date, NULL AS detail, p.id AS ref_id
+      FROM projects p WHERE p.start_date IS NOT NULL
+    UNION ALL
+    SELECT p.id, COALESCE(p.code || ' · ', '') || p.title, 'target',
+           to_char(p.target_end_date, 'YYYY-MM-DD'), NULL, p.id
+      FROM projects p JOIN project_statuses s ON s.id = p.status_id
+     WHERE p.target_end_date IS NOT NULL AND p.actual_end_date IS NULL AND NOT s.is_closed
+    UNION ALL
+    SELECT p.id, COALESCE(p.code || ' · ', '') || p.title, 'end',
+           to_char(p.actual_end_date, 'YYYY-MM-DD'), NULL, p.id
+      FROM projects p WHERE p.actual_end_date IS NOT NULL
+    UNION ALL
+    SELECT p.id, COALESCE(p.code || ' · ', '') || p.title, 'action',
+           to_char(a.due_date, 'YYYY-MM-DD'),
+           a.description || COALESCE(' (' || u.name || ')', ''), a.id
+      FROM project_actions a
+      JOIN projects p ON p.id = a.project_id
+      LEFT JOIN users u ON u.id = a.assigned_user_id
+     WHERE a.due_date IS NOT NULL AND a.state IN ('OPEN', 'IN_PROGRESS')`;
+
+  const prefix = { start: "Project starts", target: "Project target end", end: "Project completed", action: "Action due" };
+  return rows.map((r) => ({
+    key: `${r.kind}-${r.ref_id}`,
+    project_id: r.project_id,
+    date: r.date,
+    title: r.kind === "action" ? `${prefix.action}: ${r.detail ?? ""}` : `${prefix[r.kind]}: ${r.label}`,
+    description: r.kind === "action" ? `Follow-up action on ${r.label}` : r.label,
+  }));
+});
+
+/* ---------- activity history ---------- */
+
+export type ProjectActivity = {
+  id: number;
+  at: string;
+  who: string;
+  action: string;
+  entity: string;
+  details: string | null;
+};
+
+/**
+ * Everything the audit trail recorded about one project: edits, people,
+ * funding, updates, actions, documents, lessons and comments.
+ */
+export const listProjectActivity = cache(async (projectId: number): Promise<ProjectActivity[]> => {
+  await ensureSchema();
+  return sql<ProjectActivity[]>`
+    SELECT a.id,
+           to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS at,
+           COALESCE(u.name, regexp_replace(a.user_label, ' \\(.*\\)$', ''), 'System') AS who,
+           a.action, a.entity, a.details
+      FROM audit_logs a
+      LEFT JOIN users u ON u.id = a.user_id
+     WHERE a.entity_id = ${String(projectId)}
+       AND (a.entity = 'project' OR (a.entity LIKE 'project\\_%' AND a.entity <> 'project_reference'))
+     ORDER BY a.created_at DESC, a.id DESC
+     LIMIT 200`;
+});

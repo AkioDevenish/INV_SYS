@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { APP_NAME, ORG_NAME } from "@/lib/brand";
 import "./globals.css";
+import { cookies } from "next/headers";
+import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 
 const sans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -29,9 +31,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Light or dark is set server-side from the saved choice; "system" leaves it to the CSS media query.
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    <html
+      lang="en"
+      className={`${sans.variable} ${mono.variable}`}
+      data-theme={theme === "system" ? undefined : theme}
+      suppressHydrationWarning
+    >
       {/*
        * Browser extensions inject attributes into <body> before React hydrates
        * - ColorZilla adds cz-shortcut-listen, Grammarly adds its own - and the

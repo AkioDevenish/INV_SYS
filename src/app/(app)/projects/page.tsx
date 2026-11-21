@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { ListTree } from "lucide-react";
+import { BarChart3, ListTree } from "lucide-react";
 import { requirePermission } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { getReferenceLists, listAllLessons, listProjectIdsForUser, listProjects } from "@/lib/projects";
@@ -38,6 +38,9 @@ export default async function ProjectsPage() {
         description="Every project's status, model phase, people, funding, progress, documents and lessons in one record."
         actions={
           <>
+            <Link href="/projects/reports" className="btn btn-ghost">
+              <BarChart3 size={15} /> Reports
+            </Link>
             <ExportDialog
               datasets={[
                 {
@@ -75,6 +78,7 @@ export default async function ProjectsPage() {
           fundingStatuses={refs.fundingStatus}
           myProjectIds={mine}
           todayKey={astTodayKey()}
+          canManage={canManage}
         />
       </Suspense>
     </>

@@ -36,7 +36,7 @@ export function canViewNavItem(
 /** Icon names map to the lookup in `app-shell.tsx` (keeps this file server-safe). */
 export const NAV_SECTIONS: NavSection[] = [
   {
-    title: "Workspace",
+    title: "Overview",
     items: [
       {
         href: "/dashboard",
@@ -52,6 +52,11 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
         description: "Office pulse: inventory, schedule, projects and contacts",
       },
+    ],
+  },
+  {
+    title: "Workspace",
+    items: [
       {
         href: "/projects",
         label: "Projects",
@@ -73,14 +78,6 @@ export const NAV_SECTIONS: NavSection[] = [
         permission: "timelines.view",
         description: "Tasks, leads and target dates",
       },
-      {
-        href: "/inventory",
-        label: "Inventory",
-        icon: "boxes",
-        permission: "inventory.view",
-        description: "Items and stock movements",
-        match: ["/movements"],
-      },
     ],
   },
   {
@@ -99,6 +96,14 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: "briefcase",
         permission: "vendors.view",
         description: "Suppliers and service providers",
+      },
+      {
+        href: "/inventory",
+        label: "Inventory",
+        icon: "boxes",
+        permission: "inventory.view",
+        description: "Items and stock movements",
+        match: ["/movements"],
       },
     ],
   },
