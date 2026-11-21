@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs once when the Codespace is created. Everything the app needs to be
-# usable — dependencies, database tables, demo data, an admin account — is set
+# usable - dependencies, database tables, an admin account - is set
 # up here so that opening the forwarded port just works.
 set -euo pipefail
 
@@ -24,25 +24,24 @@ for attempt in $(seq 1 30); do
   sleep 2
 done
 
-echo "──> Creating tables, an administrator and demo data"
-npm run seed -- --demo
+echo "==> Creating tables and an administrator"
+npm run seed
 
-cat <<'BANNER'
+cat <<BANNER
 
   ╭──────────────────────────────────────────────────────────────╮
-  │  IICA Inventory is ready.                                    │
+  │  IICA-TT Internal System is ready.                           │
   │                                                              │
   │  The app starts automatically. When the "Open in Browser"    │
-  │  prompt appears for port 3000, open it — or use the PORTS    │
+  │  prompt appears for port 3000, open it - or use the PORTS    │
   │  tab and click the port 3000 globe icon.                     │
   │                                                              │
-  │  Sign in as:                                                 │
-  │    admin@iica.org  /  ChangeMe123        (Administrator)     │
-  │    marisol.rivera@iica.org / Manager123  (Manager)           │
-  │    daniel.okoye@iica.org / Staff12345    (Staff)             │
-  │    priya.raman@iica.org / Viewer1234     (Viewer)            │
+  │  Initial administrator account:                              │
+  │    ${ADMIN_EMAIL:-admin@iica.org}  /  ${ADMIN_PASSWORD:-ChangeMe123}                │
   │                                                              │
-  │  Sign in as each to see how the access levels differ.        │
+  │  You will be prompted to set a new password on first sign-in │
+  │  when using the default password. Create staff accounts in   │
+  │  Users & access.                                             │
   ╰──────────────────────────────────────────────────────────────╯
 
 BANNER

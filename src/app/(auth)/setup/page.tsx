@@ -26,35 +26,36 @@ const steps = [
 ];
 
 export default async function SetupPage() {
-  // Anyone can reach this URL — it only does anything while the system is empty.
+  // Anyone can reach this URL - it only does anything while the system is empty.
   if (!(await needsSetup())) redirect("/login");
+  const requireSetupToken = Boolean(process.env.SETUP_TOKEN?.trim());
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col justify-center px-5 py-10">
       <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_minmax(0,420px)]">
         <section className="animate-rise hidden lg:block">
           <BrandLockup />
-          <h1 className="mt-10 text-[2.85rem] font-semibold leading-[1.08] tracking-tight text-white">
+          <h1 className="mt-10 text-[2.85rem] font-semibold leading-[1.08] tracking-tight text-ink">
             Let&apos;s get you
             <br />
-            <span className="bg-gradient-to-r from-brand-300 via-brand-400 to-gold-300 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-iica-800 via-iica-600 to-gold-600 bg-clip-text text-transparent">
               set up.
             </span>
           </h1>
-          <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-white/55">
+          <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-ink/55">
             This system has no accounts yet. Create the administrator account and you will be
-            signed straight in — no command line, no configuration files.
+            signed straight in - no command line, no configuration files.
           </p>
 
           <ul className="mt-10 space-y-4">
             {steps.map(({ icon: Icon, title, body }) => (
               <li key={title} className="flex gap-4">
-                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-brand-500/25 bg-brand-500/10 text-brand-300">
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-iica-600/25 bg-iica-600/10 text-iica-700">
                   <Icon size={17} />
                 </span>
                 <div>
-                  <div className="text-sm font-semibold text-white">{title}</div>
-                  <div className="text-sm text-white/50">{body}</div>
+                  <div className="text-sm font-semibold text-ink">{title}</div>
+                  <div className="text-sm text-ink/50">{body}</div>
                 </div>
               </li>
             ))}
@@ -66,22 +67,22 @@ export default async function SetupPage() {
             <BrandLockup />
           </div>
           <div className="mt-6 lg:mt-0">
-            <span className="chip border-brand-400/30 bg-brand-500/10 text-brand-300">
+            <span className="chip border-iica-500/30 bg-iica-600/10 text-iica-700">
               First-run setup
             </span>
           </div>
-          <h2 className="mt-4 text-xl font-semibold tracking-tight text-white">
+          <h2 className="mt-4 text-xl font-semibold tracking-tight text-ink">
             Create your administrator account
           </h2>
-          <p className="mt-1.5 text-sm text-white/45">
+          <p className="mt-1.5 text-sm text-ink/45">
             You will be signed in as soon as this is done.
           </p>
 
           <div className="mt-7">
-            <SetupForm />
+            <SetupForm requireSetupToken={requireSetupToken} />
           </div>
 
-          <p className="mt-7 border-t border-white/8 pt-5 text-xs leading-relaxed text-white/40">
+          <p className="mt-7 border-t border-ink/8 pt-5 text-xs leading-relaxed text-ink/40">
             Choose a password you do not use anywhere else. You can add colleagues, and decide how
             much each of them can see, from the Users screen afterwards.
           </p>

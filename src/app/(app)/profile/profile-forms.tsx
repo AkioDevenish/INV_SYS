@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useOnChange, useSyncedState } from "@/lib/use-synced-state";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import {
@@ -23,7 +23,10 @@ function Submit({ label }: { label: string }) {
 function Banner({ state }: { state: ProfileState }) {
   if (state.error) {
     return (
-      <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-200">
+      <div
+        role="alert"
+        className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-700"
+      >
         <AlertCircle size={16} className="mt-0.5 shrink-0" />
         <span>{state.error}</span>
       </div>
@@ -31,7 +34,10 @@ function Banner({ state }: { state: ProfileState }) {
   }
   if (state.message) {
     return (
-      <div className="flex items-start gap-2 rounded-xl border border-brand-500/30 bg-brand-500/10 px-3 py-2.5 text-sm text-brand-200">
+      <div
+        role="status"
+        className="flex items-start gap-2 rounded-xl border border-iica-600/30 bg-iica-600/10 px-3 py-2.5 text-sm text-iica-800"
+      >
         <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
         <span>{state.message}</span>
       </div>
@@ -40,13 +46,10 @@ function Banner({ state }: { state: ProfileState }) {
   return null;
 }
 
-export function DetailsForm({ name, email }: { name: string; email: string }) {
+export function DetailsForm({ name: initialName, email }: { name: string; email: string }) {
   const [state, action] = useActionState<ProfileState, FormData>(updateProfileAction, {});
-  const router = useRouter();
-
-  useEffect(() => {
-    if (state.message) router.refresh();
-  }, [state, router]);
+  // Follows the saved name after a successful update.
+  const [name, setName] = useSyncedState(initialName);
 
   return (
     <form action={action} className="space-y-4">
@@ -55,14 +58,22 @@ export function DetailsForm({ name, email }: { name: string; email: string }) {
         <label className="label" htmlFor="profile-name">
           Full name
         </label>
-        <input id="profile-name" name="name" required defaultValue={name} className="field" />
+        <input
+          id="profile-name"
+          name="name"
+          required
+          maxLength={120}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="field"
+        />
       </div>
       <div>
         <label className="label" htmlFor="profile-email">
           Email address
         </label>
         <input id="profile-email" value={email} disabled className="field" />
-        <p className="mt-2 text-xs text-white/35">
+        <p className="mt-2 text-xs text-ink/55">
           Only an administrator can change the email address on an account.
         </p>
       </div>
@@ -75,6 +86,20 @@ export function DetailsForm({ name, email }: { name: string; email: string }) {
 
 export function PasswordForm() {
   const [state, action] = useActionState<ProfileState, FormData>(changePasswordAction, {});
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // A successful change clears all three fields.
+  useOnChange(state, (next) => {
+    if (next.message) {
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  });
+
+  const mismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
 
   return (
     <form action={action} className="space-y-4">
@@ -88,7 +113,10 @@ export function PasswordForm() {
           name="current_password"
           type="password"
           required
+          maxLength={256}
           autoComplete="current-password"
+          value={currentPassword}
+          onChange={(e) => setCurrentPassword(e.target.value)}
           className="field"
         />
       </div>
@@ -102,7 +130,11 @@ export function PasswordForm() {
             name="new_password"
             type="password"
             required
+            minLength={8}
+            maxLength={256}
             autoComplete="new-password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
             className="field"
           />
         </div>
@@ -115,12 +147,20 @@ export function PasswordForm() {
             name="confirm_password"
             type="password"
             required
+            minLength={8}
+            maxLength={256}
             autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             className="field"
+            aria-invalid={mismatch || undefined}
           />
+          {mismatch && (
+            <p className="mt-1 text-xs text-rose-700">New passwords do not match yet.</p>
+          )}
         </div>
       </div>
-      <p className="text-xs text-white/35">
+      <p className="text-xs text-ink/55">
         At least 8 characters, including a letter and a number.
       </p>
       <div className="flex justify-end">

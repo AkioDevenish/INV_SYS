@@ -1,9 +1,20 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useOnChange } from "@/lib/use-synced-state";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { AlertCircle, Loader2, Pencil, Trash2, UserPlus } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  Copy,
+  Eye,
+  EyeOff,
+  Loader2,
+  RefreshCw,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
 import { Modal } from "@/components/modal";
 import { ROLES, ROLE_DESCRIPTIONS, ROLE_LABELS, type Role } from "@/lib/roles";
 import type { UserRow } from "@/lib/queries";
@@ -13,6 +24,175 @@ import {
   updateUserAction,
   type UserState,
 } from "./actions";
+
+function cryptoRandomIndex(max: number): number {
+  if (max <= 1) return 0;
+  const limit = Math.floor(0x100000000 / max) * max;
+  const buf = new Uint32Array(1);
+  while (true) {
+    crypto.getRandomValues(buf);
+    if (buf[0]! < limit) return buf[0]! % max;
+  }
+}
+
+function generateStrongPassword(): string {
+  const letters = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const all = letters + digits;
+  const pick = (pool: string) => pool[cryptoRandomIndex(pool.length)]!;
+  const chars = [
+    pick(letters),
+    pick(digits),
+    ...Array.from({ length: 10 }, () => pick(all)),
+  ];
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = cryptoRandomIndex(i + 1);
+    [chars[i], chars[j]] = [chars[j]!, chars[i]!];
+  }
+  return chars.join("");
+}
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall through to legacy textarea copy when Clipboard API is restricted.
+    }
+  }
+  if (typeof document === "undefined") return false;
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const ok = document.execCommand("copy");
+    textarea.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function PasswordInputWithTools({
+  id,
+  name,
+  label,
+  required = false,
+  placeholder,
+  value: controlledValue,
+  onValueChange,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  required?: boolean;
+  placeholder?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
+}) {
+  const [internalValue, setInternalValue] = useState("");
+  const value = controlledValue ?? internalValue;
+  const setValue = (next: string) => {
+    if (onValueChange) onValueChange(next);
+    else setInternalValue(next);
+  };
+
+  const [visible, setVisible] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const clearTimer = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const handleGenerate = () => {
+    clearTimer();
+    setValue(generateStrongPassword());
+    setVisible(true);
+    setCopyState("idle");
+  };
+
+  const handleCopy = async () => {
+    if (!value) return;
+    clearTimer();
+    const ok = await copyToClipboard(value);
+    setCopyState(ok ? "copied" : "failed");
+    timerRef.current = setTimeout(() => setCopyState("idle"), 2000);
+  };
+
+  return (
+    <div>
+      <label className="label" htmlFor={id}>
+        {label}
+      </label>
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+        <div className="relative min-w-0 flex-1">
+          <input
+            id={id}
+            name={name}
+            type={visible ? "text" : "password"}
+            required={required}
+            minLength={value.length > 0 || required ? 8 : undefined}
+            maxLength={256}
+            autoComplete="new-password"
+            value={value}
+            onChange={(e) => {
+              clearTimer();
+              setValue(e.target.value);
+              setCopyState("idle");
+            }}
+            className="field pr-9 font-mono text-xs"
+            placeholder={placeholder}
+          />
+          <button
+            type="button"
+            onClick={() => setVisible((v) => !v)}
+            className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded p-0.5 text-ink/50 hover:text-ink"
+            aria-label={visible ? "Hide password" : "Show password"}
+          >
+            {visible ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={handleGenerate}
+          className="btn btn-ghost shrink-0 px-3 py-2 text-xs"
+          title="Generate a strong temporary password"
+        >
+          <RefreshCw size={13} /> Generate
+        </button>
+        <button
+          type="button"
+          onClick={handleCopy}
+          disabled={!value}
+          className="btn btn-ghost shrink-0 px-3 py-2 text-xs"
+          title="Copy password"
+        >
+          {copyState === "copied" ? (
+            <Check size={13} className="text-emerald-700" />
+          ) : (
+            <Copy size={13} />
+          )}
+          {copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -27,7 +207,10 @@ function Submit({ label }: { label: string }) {
 function ErrorBanner({ message }: { message?: string }) {
   if (!message) return null;
   return (
-    <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-200">
+    <div
+      role="alert"
+      className="mb-4 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-700"
+    >
       <AlertCircle size={16} className="mt-0.5 shrink-0" />
       <span>{message}</span>
     </div>
@@ -36,17 +219,21 @@ function ErrorBanner({ message }: { message?: string }) {
 
 function RoleChooser({ defaultRole }: { defaultRole?: Role }) {
   const [role, setRole] = useState<Role>(defaultRole ?? "VIEWER");
+  useOnChange(defaultRole, (next) => {
+    if (next) setRole(next);
+  });
+
   return (
-    <div>
-      <span className="label">Access level</span>
+    <fieldset>
+      <legend className="label">Access level</legend>
       <div className="grid gap-2 sm:grid-cols-2">
         {ROLES.map((option) => (
           <label
             key={option}
-            className={`cursor-pointer rounded-xl border p-3 transition ${
+            className={`cursor-pointer rounded-xl border p-3 transition focus-within:ring-2 focus-within:ring-iica-600/40 ${
               role === option
-                ? "border-brand-400/50 bg-brand-500/10"
-                : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05]"
+                ? "border-iica-700 bg-iica-50/70 ring-1 ring-iica-700/20"
+                : "border-ink/10 bg-white hover:border-iica-300 hover:bg-iica-50/30"
             }`}
           >
             <input
@@ -57,27 +244,78 @@ function RoleChooser({ defaultRole }: { defaultRole?: Role }) {
               onChange={() => setRole(option)}
               className="sr-only"
             />
-            <div className="text-sm font-semibold text-white">{ROLE_LABELS[option]}</div>
-            <div className="mt-0.5 text-xs leading-relaxed text-white/45">
+            <div className="text-sm font-semibold text-ink">{ROLE_LABELS[option]}</div>
+            <div className="mt-0.5 text-xs leading-relaxed text-ink/60">
               {ROLE_DESCRIPTIONS[option]}
             </div>
           </label>
         ))}
       </div>
-    </div>
+    </fieldset>
   );
 }
 
-function CreateForm({ onDone }: { onDone: () => void }) {
+export function CreateUserForm({ onDone }: { onDone: () => void }) {
   const [state, action] = useActionState<UserState, FormData>(createUserAction, {});
-  const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
 
-  useEffect(() => {
-    if (state.ok) {
-      onDone();
-      router.refresh();
-    }
-  }, [state, onDone, router]);
+  if (state.ok) {
+    const handleCopyCredentials = async () => {
+      const ok = await copyToClipboard(`Email: ${email.trim().toLowerCase()}\nTemporary password: ${password}`);
+      setCopied(ok ? "copied" : "failed");
+    };
+
+    return (
+      <div className="space-y-4">
+        <div
+          role="status"
+          className="flex items-start gap-2.5 rounded-xl border border-emerald-600/30 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-900"
+        >
+          <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-700" />
+          <span>{state.message ?? "Account created."}</span>
+        </div>
+
+        <div className="space-y-2 rounded-xl border border-ink/10 bg-iica-50/45 p-3.5 text-xs">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-ink/60">Email</span>
+            <span className="font-mono font-medium text-ink">{email.trim().toLowerCase()}</span>
+          </div>
+          {password && (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-ink/60">Temporary password</span>
+              <span className="font-mono font-semibold text-ink">{password}</span>
+            </div>
+          )}
+          <p className="pt-1 text-ink/60">
+            They will be asked to choose their own password on first sign-in.
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          {password && (
+            <button type="button" onClick={handleCopyCredentials} className="btn btn-ghost">
+              {copied === "copied" ? (
+                <Check size={14} className="text-emerald-700" />
+              ) : (
+                <Copy size={14} />
+              )}
+              {copied === "copied"
+                ? "Copied credentials"
+                : copied === "failed"
+                  ? "Copy failed"
+                  : "Copy credentials"}
+            </button>
+          )}
+          <button type="button" onClick={onDone} className="btn btn-primary">
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form action={action} className="space-y-4">
@@ -87,7 +325,16 @@ function CreateForm({ onDone }: { onDone: () => void }) {
           <label className="label" htmlFor="new-name">
             Full name
           </label>
-          <input id="new-name" name="name" required className="field" placeholder="Ana Pérez" />
+          <input
+            id="new-name"
+            name="name"
+            required
+            maxLength={120}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="field"
+            placeholder="Full name"
+          />
         </div>
         <div>
           <label className="label" htmlFor="new-email">
@@ -98,24 +345,23 @@ function CreateForm({ onDone }: { onDone: () => void }) {
             name="email"
             type="email"
             required
+            maxLength={254}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="field"
-            placeholder="ana.perez@iica.org"
+            placeholder="name@iica.int"
           />
         </div>
       </div>
-      <div>
-        <label className="label" htmlFor="new-password">
-          Temporary password
-        </label>
-        <input
-          id="new-password"
-          name="password"
-          type="text"
-          required
-          className="field font-mono"
-          placeholder="At least 8 characters, with a number"
-        />
-      </div>
+      <PasswordInputWithTools
+        id="new-password"
+        name="password"
+        label="Temporary password"
+        required
+        value={password}
+        onValueChange={setPassword}
+        placeholder="At least 8 characters, with a letter and a number"
+      />
       <RoleChooser />
       <div className="flex justify-end gap-2 pt-1">
         <button type="button" className="btn btn-ghost" onClick={onDone}>
@@ -132,8 +378,8 @@ export function NewUserButton() {
 
   return (
     <>
-      <button className="btn btn-primary" onClick={() => setOpen(true)}>
-        <UserPlus size={15} /> Invite user
+      <button type="button" className="btn btn-primary" onClick={() => setOpen(true)}>
+        <UserPlus size={15} /> Create user
       </button>
       <Modal
         open={open}
@@ -141,22 +387,50 @@ export function NewUserButton() {
         title="Create an account"
         description="Set a temporary password and share it with the person directly."
       >
-        <CreateForm onDone={() => setOpen(false)} />
+        <CreateUserForm onDone={() => setOpen(false)} />
       </Modal>
     </>
   );
 }
 
-function UpdateForm({ user, onDone }: { user: UserRow; onDone: () => void }) {
+export function UpdateUserForm({
+  user,
+  isSelf = false,
+  onDone,
+  onSuccess,
+}: {
+  user: UserRow;
+  isSelf?: boolean;
+  onDone: () => void;
+  onSuccess?: (message: string) => void;
+}) {
   const [state, action] = useActionState<UserState, FormData>(updateUserAction, {});
-  const router = useRouter();
+  const [name, setName] = useState(user.name);
+  const [email, setEmail] = useState(user.email);
+  const [status, setStatus] = useState<"ACTIVE" | "DISABLED">(user.status);
+  const [password, setPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+
+  const callbacksRef = useRef({ onDone, onSuccess });
+  useEffect(() => {
+    callbacksRef.current = { onDone, onSuccess };
+  }, [onDone, onSuccess]);
+
+  // A different (or refreshed) account resets the form to its saved values.
+  useOnChange(user, (next) => {
+    setName(next.name);
+    setEmail(next.email);
+    setStatus(next.status);
+    setPassword("");
+    setCurrentPassword("");
+  });
 
   useEffect(() => {
     if (state.ok) {
-      onDone();
-      router.refresh();
+      if (state.message) callbacksRef.current.onSuccess?.(state.message);
+      callbacksRef.current.onDone();
     }
-  }, [state, onDone, router]);
+  }, [state]);
 
   return (
     <form action={action} className="space-y-4">
@@ -171,7 +445,9 @@ function UpdateForm({ user, onDone }: { user: UserRow; onDone: () => void }) {
             id={`name-${user.id}`}
             name="name"
             required
-            defaultValue={user.name}
+            maxLength={120}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             className="field"
           />
         </div>
@@ -184,39 +460,63 @@ function UpdateForm({ user, onDone }: { user: UserRow; onDone: () => void }) {
             name="email"
             type="email"
             required
-            defaultValue={user.email}
+            maxLength={254}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="field"
           />
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="label" htmlFor={`password-${user.id}`}>
-            Reset password
-          </label>
-          <input
-            id={`password-${user.id}`}
-            name="password"
-            type="text"
-            className="field font-mono"
-            placeholder="Leave blank to keep current"
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor={`status-${user.id}`}>
-            Account status
-          </label>
-          <select
-            id={`status-${user.id}`}
-            name="status"
-            defaultValue={user.status}
-            className="field"
-          >
-            <option value="ACTIVE">Active — can sign in</option>
-            <option value="DISABLED">Disabled — access blocked</option>
-          </select>
-        </div>
+      <div className="space-y-3">
+        <PasswordInputWithTools
+          id={`password-${user.id}`}
+          name="password"
+          label="Reset password (leave blank to keep unchanged)"
+          value={password}
+          onValueChange={setPassword}
+          placeholder="Enter or generate a new password"
+        />
+        {isSelf && password.length > 0 && (
+          <div>
+            <label className="label" htmlFor={`current-password-${user.id}`}>
+              Current password (required to change your own password)
+            </label>
+            <input
+              id={`current-password-${user.id}`}
+              name="current_password"
+              type="password"
+              required
+              maxLength={256}
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Enter your current password"
+              className="field"
+            />
+          </div>
+        )}
+        <p className="text-xs text-ink/60">
+          {isSelf
+            ? "Changing your own password requires your current password and refreshes your session."
+            : "Setting a password signs the user out of existing sessions and prompts a password change."}
+        </p>
+      </div>
+
+      <div>
+        <label className="label" htmlFor={`status-${user.id}`}>
+          Account status
+        </label>
+        <select
+          id={`status-${user.id}`}
+          name="status"
+          value={status}
+          onChange={(e) => setStatus(e.target.value === "DISABLED" ? "DISABLED" : "ACTIVE")}
+          className="field"
+        >
+          <option value="ACTIVE">Active</option>
+          <option value="DISABLED">Disabled</option>
+        </select>
       </div>
 
       <RoleChooser defaultRole={user.role} />
@@ -231,47 +531,32 @@ function UpdateForm({ user, onDone }: { user: UserRow; onDone: () => void }) {
   );
 }
 
-export function EditUserButton({ user, isSelf }: { user: UserRow; isSelf: boolean }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <button
-        className="rounded-lg p-2 text-white/40 transition hover:bg-white/5 hover:text-white"
-        onClick={() => setOpen(true)}
-        aria-label={`Edit ${user.name}`}
-      >
-        <Pencil size={15} />
-      </button>
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title={`Edit ${user.name}`}
-        description={isSelf ? "This is your own account." : undefined}
-      >
-        <UpdateForm user={user} onDone={() => setOpen(false)} />
-      </Modal>
-    </>
-  );
-}
-
-function RemoveForm({ user, onDone }: { user: UserRow; onDone: () => void }) {
+export function RemoveUserForm({
+  user,
+  onDone,
+  onSuccess,
+}: {
+  user: UserRow;
+  onDone: () => void;
+  onSuccess?: (message: string) => void;
+}) {
   const [state, action] = useActionState<UserState, FormData>(deleteUserAction, {});
-  const router = useRouter();
+  const callbacksRef = useRef({ onDone, onSuccess });
+  useEffect(() => {
+    callbacksRef.current = { onDone, onSuccess };
+  }, [onDone, onSuccess]);
 
   useEffect(() => {
     if (state.ok) {
-      onDone();
-      router.refresh();
+      if (state.message) callbacksRef.current.onSuccess?.(state.message);
+      callbacksRef.current.onDone();
     }
-  }, [state, onDone, router]);
+  }, [state]);
 
   return (
     <>
-      <p className="mb-4 text-sm leading-relaxed text-white/60">
-        The account is deleted and can no longer sign in. Stock movements they recorded stay in the
-        history, but are no longer attributed to a named user. Disabling the account instead keeps
-        that attribution intact.
+      <p className="mb-4 text-sm leading-relaxed text-ink/65">
+        The account is deleted and can no longer sign in. Stock movements and audit logs they recorded remain intact. Disabling the account instead preserves attribution.
       </p>
       <ErrorBanner message={state.error} />
       <form action={action} className="flex justify-end gap-2">
@@ -281,30 +566,6 @@ function RemoveForm({ user, onDone }: { user: UserRow; onDone: () => void }) {
         </button>
         <DeleteSubmit />
       </form>
-    </>
-  );
-}
-
-export function DeleteUserButton({ user }: { user: UserRow }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <button
-        className="rounded-lg p-2 text-white/40 transition hover:bg-rose-500/10 hover:text-rose-300"
-        onClick={() => setOpen(true)}
-        aria-label={`Remove ${user.name}`}
-      >
-        <Trash2 size={15} />
-      </button>
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title={`Remove ${user.name}?`}
-        width="max-w-md"
-      >
-        <RemoveForm user={user} onDone={() => setOpen(false)} />
-      </Modal>
     </>
   );
 }

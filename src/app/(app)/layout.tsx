@@ -1,22 +1,27 @@
 import { requireUser } from "@/lib/auth";
-import { can } from "@/lib/roles";
+import { getPermissionMatrix } from "@/lib/permissions";
 import { AppShell } from "@/components/app-shell";
-import { NAV_SECTIONS } from "@/components/nav-config";
+import { cookies } from "next/headers";
+import { THEME_COOKIE, parseTheme } from "@/lib/theme";
+import { NAV_SECTIONS, canViewNavItem } from "@/components/nav-config";
 import { logoutAction } from "../(auth)/login/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
 
+  // One read for the whole sidebar rather than one per nav item.
+  const matrix = await getPermissionMatrix();
   const sections = NAV_SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => can(user.role, item.permission)),
+    items: section.items.filter((item) => canViewNavItem(matrix, user.role, item)),
   })).filter((section) => section.items.length > 0);
 
   return (
     <AppShell
       sections={sections}
-      user={{ name: user.name, email: user.email, role: user.role }}
+      user={{ name: user.name, role: user.role }}
       logout={logoutAction}
+      theme={parseTheme((await cookies()).get(THEME_COOKIE)?.value)}
     >
       {children}
     </AppShell>

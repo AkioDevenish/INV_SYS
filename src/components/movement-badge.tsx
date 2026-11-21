@@ -4,17 +4,17 @@ const CONFIG = {
   IN: {
     label: "Received",
     icon: ArrowDownLeft,
-    className: "border-brand-400/30 bg-brand-500/10 text-brand-300",
+    className: "border-iica-500/30 bg-iica-600/10 text-iica-700",
   },
   OUT: {
     label: "Issued",
     icon: ArrowUpRight,
-    className: "border-gold-400/30 bg-gold-400/10 text-gold-300",
+    className: "border-gold-500/40 bg-gold-400/15 text-gold-700",
   },
   ADJUST: {
     label: "Adjusted",
     icon: SlidersHorizontal,
-    className: "border-sky-400/30 bg-sky-400/10 text-sky-300",
+    className: "border-sky-600/35 bg-sky-100 text-sky-800",
   },
 } as const;
 
@@ -33,17 +33,19 @@ export function MovementTypeBadge({
   if (withLabel) {
     return (
       <span className={`chip ${config.className}`}>
-        <Icon size={12} /> {config.label}
+        <Icon size={12} aria-hidden="true" /> {config.label}
       </span>
     );
   }
 
   return (
     <span
+      role="img"
+      aria-label={config.label}
       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${config.className}`}
       title={config.label}
     >
-      <Icon size={14} />
+      <Icon size={14} aria-hidden="true" />
     </span>
   );
 }

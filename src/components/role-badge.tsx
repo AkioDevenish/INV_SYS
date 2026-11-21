@@ -1,10 +1,10 @@
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 
 const STYLES: Record<Role, string> = {
-  ADMIN: "border-gold-400/35 bg-gold-400/10 text-gold-300",
-  MANAGER: "border-brand-400/35 bg-brand-500/10 text-brand-300",
-  STAFF: "border-sky-400/35 bg-sky-400/10 text-sky-300",
-  VIEWER: "border-white/15 bg-white/5 text-white/60",
+  ADMIN: "border-iica-200 bg-iica-50 text-iica-800",
+  MANAGER: "border-iica-600/45 bg-iica-200 text-iica-800",
+  STAFF: "border-sky-600/40 bg-sky-100 text-sky-800",
+  VIEWER: "border-ink/30 bg-ink/10 text-ink/70",
 };
 
 export function RoleBadge({ role, className = "" }: { role: Role; className?: string }) {
