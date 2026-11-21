@@ -27,6 +27,16 @@ function ago(iso: string): string {
  * The bell: unread count, and a panel of recent notifications. Polls every
  * minute and whenever the window regains focus.
  */
+/** Never throws: when offline, the bell simply keeps what it already shows. */
+async function fetchNotifications(init?: RequestInit): Promise<{ items: NotificationRow[]; unread: number } | null> {
+  try {
+    const res = await fetch("/api/notifications", { cache: "no-store", ...init });
+    return res.ok ? ((await res.json()) as { items: NotificationRow[]; unread: number }) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function NotificationBell({ align = "left" }: { align?: "left" | "right" }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -34,22 +44,21 @@ export function NotificationBell({ align = "left" }: { align?: "left" | "right" 
   const [unread, setUnread] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async (init?: RequestInit) => {
-    try {
-      const res = await fetch("/api/notifications", { cache: "no-store", ...init });
-      if (!res.ok) return;
-      const data = (await res.json()) as { items: NotificationRow[]; unread: number };
+  const load = useCallback((init?: RequestInit) => {
+    return fetchNotifications(init).then((data) => {
+      if (!data) return;
       setItems(data.items);
       setUnread(data.unread);
-    } catch {
-      /* offline: keep what we have */
-    }
+    });
   }, []);
 
   useEffect(() => {
-    void load();
-    const t = setInterval(() => void load(), 60_000);
-    const onFocus = () => void load();
+    const refresh = () => {
+      void load();
+    };
+    refresh();
+    const t = setInterval(refresh, 60_000);
+    const onFocus = refresh;
     window.addEventListener("focus", onFocus);
     return () => {
       clearInterval(t);

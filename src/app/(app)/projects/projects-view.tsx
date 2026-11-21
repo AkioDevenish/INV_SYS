@@ -129,7 +129,9 @@ export function ProjectsView({
   const rawPage = Number.isFinite(parsedPage) ? Math.max(1, Math.trunc(parsedPage)) : 1;
 
   const searchParamsRef = useRef(searchParams);
-  searchParamsRef.current = searchParams;
+  useEffect(() => {
+    searchParamsRef.current = searchParams;
+  }, [searchParams]);
 
   const urlQ = searchParams.get("q") ?? "";
   const [searchInput, setSearchInput] = useState(urlQ);

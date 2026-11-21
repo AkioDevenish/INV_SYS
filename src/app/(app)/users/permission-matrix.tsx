@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnChange } from "@/lib/use-synced-state";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { AlertCircle, Check, Loader2, RotateCcw, X } from "lucide-react";
@@ -88,9 +89,10 @@ export function PermissionMatrixEditor({
   const dirty = currentKey !== initialKey;
   const isAtDefaults = !dirty && initialKey === defaultsKey;
 
-  useEffect(() => {
-    setChecked(new Set(ROLES.flatMap((r) => matrix[r].map((p) => key(r, p)))));
-  }, [matrix]);
+  // A saved or reset matrix from the server replaces the local ticks.
+  useOnChange(matrix, (next) => {
+    setChecked(new Set(ROLES.flatMap((r) => next[r].map((p) => key(r, p)))));
+  });
 
   useEffect(() => {
     onDirtyChange?.(dirty);
@@ -106,11 +108,10 @@ export function PermissionMatrixEditor({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
-  useEffect(() => {
-    if (lastAction === "reset" && resetState.ok) {
-      setConfirmResetOpen(false);
-    }
-  }, [lastAction, resetState]);
+  // A successful reset closes its confirmation dialog.
+  useOnChange(resetState, (next) => {
+    if (lastAction === "reset" && next.ok) setConfirmResetOpen(false);
+  });
 
   const toggle = (role: Role, permission: Permission) => {
     setChecked((current) => {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useOnChange } from "@/lib/use-synced-state";
+import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
   AlertCircle,
@@ -62,13 +63,14 @@ export function MovementForm({
   const [note, setNote] = useState("");
   const [dismissedState, setDismissedState] = useState<MovementState | null>(null);
 
-  useEffect(() => {
+  // Each new result shows its banner again; a success clears the entry fields.
+  useOnChange(state, (next) => {
     setDismissedState(null);
-    if (state.ok) {
+    if (next.ok) {
       setQuantity("");
       setNote("");
     }
-  }, [state]);
+  });
 
   const filteredItems = useMemo(() => {
     const q = itemQuery.trim().toLowerCase();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -56,11 +56,16 @@ export function DashboardGrid({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
-  useEffect(() => {
-    if (arranging) return;
-    setOrder(initialLayout.order);
-    setHidden(initialLayout.hidden);
-  }, [initialLayout, arranging]);
+  // Follow the saved layout, except while arranging; leaving arrange mode
+  // drops unsaved moves. Done during render rather than in an effect.
+  const [synced, setSynced] = useState({ layout: initialLayout, arranging });
+  if (synced.layout !== initialLayout || synced.arranging !== arranging) {
+    setSynced({ layout: initialLayout, arranging });
+    if (!arranging) {
+      setOrder(initialLayout.order);
+      setHidden(initialLayout.hidden);
+    }
+  }
 
   // Only panels this person can actually see.
   const present = order.filter((id) => panels[id] !== undefined && id in PANELS);

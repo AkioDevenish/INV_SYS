@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useOnChange, useSyncedState } from "@/lib/use-synced-state";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import {
@@ -47,11 +48,8 @@ function Banner({ state }: { state: ProfileState }) {
 
 export function DetailsForm({ name: initialName, email }: { name: string; email: string }) {
   const [state, action] = useActionState<ProfileState, FormData>(updateProfileAction, {});
-  const [name, setName] = useState(initialName);
-
-  useEffect(() => {
-    setName(initialName);
-  }, [initialName]);
+  // Follows the saved name after a successful update.
+  const [name, setName] = useSyncedState(initialName);
 
   return (
     <form action={action} className="space-y-4">
@@ -92,13 +90,14 @@ export function PasswordForm() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  useEffect(() => {
-    if (state.message) {
+  // A successful change clears all three fields.
+  useOnChange(state, (next) => {
+    if (next.message) {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     }
-  }, [state]);
+  });
 
   const mismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
 

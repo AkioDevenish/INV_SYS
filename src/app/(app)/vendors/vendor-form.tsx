@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnChange } from "@/lib/use-synced-state";
 import { useActionState, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   CalendarPlus,
@@ -478,23 +479,22 @@ export function EngagementFormFields({
     state.values?.next_vendor_due_date ?? "",
   );
 
-  useEffect(() => {
-    if (state.values?.vendor_id !== undefined) {
-      setSelectedVendorId(state.values.vendor_id);
+  // Each new result restores what was typed (after an error) or clears the
+  // due-date field (after adding), during render rather than in an effect.
+  useOnChange(state, (next) => {
+    if (next.values?.vendor_id !== undefined) setSelectedVendorId(next.values.vendor_id);
+    if (next.values?.next_vendor_due_date !== undefined) {
+      setNextVendorDueInput(next.values.next_vendor_due_date);
     }
-    if (state.values?.next_vendor_due_date !== undefined) {
-      setNextVendorDueInput(state.values.next_vendor_due_date);
-    }
-  }, [state.attempt, state.values]);
+    if (next.ok && !isEdit) setNextVendorDueInput("");
+  });
 
+  // The native form reset and the parent's callback are side effects, so they stay here.
   useEffect(() => {
     if (!state.ok) return;
-    if (!isEdit) {
-      ref.current?.reset();
-      setNextVendorDueInput("");
-    }
+    if (!isEdit) ref.current?.reset();
     onSavedRef.current?.();
-  }, [state.ok, isEdit]);
+  }, [state, isEdit]);
 
   const val = (key: string, fallback: string) => state.values?.[key] ?? fallback;
 

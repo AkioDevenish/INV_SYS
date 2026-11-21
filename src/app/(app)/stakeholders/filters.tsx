@@ -1,7 +1,8 @@
 "use client";
 
+import { useSyncedState } from "@/lib/use-synced-state";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useTransition } from "react";
 import { Loader2, Search, X } from "lucide-react";
 
 type Option = { id: number; name: string; item_count?: number };
@@ -15,7 +16,8 @@ export function StakeholderFilters({
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
   const urlQuery = params.get("q") ?? "";
-  const [search, setSearch] = useState(urlQuery);
+  // Follows the URL on Back/Forward while staying editable in between.
+  const [search, setSearch] = useSyncedState(urlQuery);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cancelPendingDebounce = () => {
@@ -24,10 +26,6 @@ export function StakeholderFilters({
       timerRef.current = null;
     }
   };
-
-  useEffect(() => {
-    setSearch(urlQuery);
-  }, [urlQuery]);
 
   const apply = (key: string, value: string) => {
     cancelPendingDebounce();

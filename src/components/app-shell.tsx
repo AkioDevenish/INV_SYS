@@ -163,7 +163,8 @@ export function AppShell({ sections, user, logout, children, theme = "system" }:
     return APP_NAME;
   }, [pathname, sections]);
 
-  const renderNav = (onNavigate?: () => void) => (
+  // inDrawer: links in the phone drawer close it when followed.
+  const renderNav = (inDrawer = false) => (
     <nav aria-label="Primary" className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
       {sections.map((section, i) => (
         <div key={section.title || `section-${i}`}>
@@ -181,7 +182,7 @@ export function AppShell({ sections, user, logout, children, theme = "system" }:
                   <Link
                     href={item.href}
                     aria-current={active ? "page" : undefined}
-                    onClick={onNavigate}
+                    onClick={inDrawer ? () => closeDrawer(false) : undefined}
                     title={item.description}
                     className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-all duration-200 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iica-600 motion-safe:active:scale-[0.99] ${
                       active
@@ -209,12 +210,12 @@ export function AppShell({ sections, user, logout, children, theme = "system" }:
     </nav>
   );
 
-  const renderAccount = (onNavigate?: () => void) => (
+  const renderAccount = (inDrawer = false) => (
     <div className="border-t border-ink/8 p-3">
       <div className="space-y-2 rounded-xl border border-ink/8 bg-iica-50/40 p-2.5">
         <Link
           href="/profile"
-          onClick={onNavigate}
+          onClick={inDrawer ? () => closeDrawer(false) : undefined}
           className="flex min-w-0 items-center gap-2.5 rounded-lg p-0.5 transition hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iica-600"
         >
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-iica-700 text-xs font-semibold text-white">
@@ -308,8 +309,8 @@ export function AppShell({ sections, user, logout, children, theme = "system" }:
                 <X size={18} aria-hidden="true" />
               </button>
             </div>
-            {renderNav(() => closeDrawer(false))}
-            {renderAccount(() => closeDrawer(false))}
+            {renderNav(true)}
+            {renderAccount(true)}
           </aside>
         </div>
       )}

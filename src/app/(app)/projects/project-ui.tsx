@@ -41,7 +41,9 @@ export function ActionForm({
   const [state, formAction, pending] = useActionState<ProjectState, FormData>(action, {});
   const [, startTransition] = useTransition();
   const doneRef = useRef(onDone);
-  doneRef.current = onDone;
+  useEffect(() => {
+    doneRef.current = onDone;
+  }, [onDone]);
 
   useEffect(() => {
     if (state.ok) doneRef.current(state);

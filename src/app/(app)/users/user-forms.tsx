@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnChange } from "@/lib/use-synced-state";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
@@ -218,9 +219,9 @@ function ErrorBanner({ message }: { message?: string }) {
 
 function RoleChooser({ defaultRole }: { defaultRole?: Role }) {
   const [role, setRole] = useState<Role>(defaultRole ?? "VIEWER");
-  useEffect(() => {
-    if (defaultRole) setRole(defaultRole);
-  }, [defaultRole]);
+  useOnChange(defaultRole, (next) => {
+    if (next) setRole(next);
+  });
 
   return (
     <fieldset>
@@ -411,15 +412,18 @@ export function UpdateUserForm({
   const [currentPassword, setCurrentPassword] = useState("");
 
   const callbacksRef = useRef({ onDone, onSuccess });
-  callbacksRef.current = { onDone, onSuccess };
-
   useEffect(() => {
-    setName(user.name);
-    setEmail(user.email);
-    setStatus(user.status);
+    callbacksRef.current = { onDone, onSuccess };
+  }, [onDone, onSuccess]);
+
+  // A different (or refreshed) account resets the form to its saved values.
+  useOnChange(user, (next) => {
+    setName(next.name);
+    setEmail(next.email);
+    setStatus(next.status);
     setPassword("");
     setCurrentPassword("");
-  }, [user]);
+  });
 
   useEffect(() => {
     if (state.ok) {
@@ -538,7 +542,9 @@ export function RemoveUserForm({
 }) {
   const [state, action] = useActionState<UserState, FormData>(deleteUserAction, {});
   const callbacksRef = useRef({ onDone, onSuccess });
-  callbacksRef.current = { onDone, onSuccess };
+  useEffect(() => {
+    callbacksRef.current = { onDone, onSuccess };
+  }, [onDone, onSuccess]);
 
   useEffect(() => {
     if (state.ok) {

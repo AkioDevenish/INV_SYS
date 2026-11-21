@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, MessageSquare, Send, Trash2 } from "lucide-react";
 import { initials } from "@/lib/format";
 import type { CommentRow, Mentionable } from "@/lib/comments";
@@ -42,7 +42,16 @@ function renderBody(body: string, people: Mentionable[]) {
  * colleague; they get a notification, as do the people responsible.
  */
 export function CommentThread({ type, id, compact = false }: { type: "project" | "task"; id: number; compact?: boolean }) {
-  const [data, setData] = useState<Payload | null>(null);
+  // Loaded data remembers which record it belongs to, so switching tasks
+  // never shows the previous task's thread while the new one loads.
+  const target = `${type}:${id}`;
+  const [loaded, setLoaded] = useState<{ target: string; payload: Payload } | null>(null);
+  const data = loaded?.target === target ? loaded.payload : null;
+  const setData = (update: (d: Payload | null) => Payload | null) =>
+    setLoaded((prev) => {
+      const next = update(prev?.target === target ? prev.payload : null);
+      return next ? { target, payload: next } : null;
+    });
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string>();
@@ -51,15 +60,18 @@ export function CommentThread({ type, id, compact = false }: { type: "project" |
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async () => {
-    const res = await fetch(`/api/comments?type=${type}&id=${id}`, { cache: "no-store" });
-    if (res.ok) setData((await res.json()) as Payload);
-  }, [type, id]);
-
   useEffect(() => {
-    setData(null);
-    void load();
-  }, [load]);
+    let alive = true;
+    fetch(`/api/comments?type=${type}&id=${id}`, { cache: "no-store" })
+      .then((res) => (res.ok ? (res.json() as Promise<Payload>) : null))
+      .then((payload) => {
+        if (alive && payload) setLoaded({ target: `${type}:${id}`, payload });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [type, id]);
 
   const suggestions = useMemo(() => {
     if (!mention || !data) return [];

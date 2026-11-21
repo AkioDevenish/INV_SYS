@@ -19,6 +19,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { lockBodyScroll } from "./modal";
+import { useIsClient } from "@/lib/use-is-client";
 import type { NavSection } from "./nav-config";
 import type { SearchGroup, SearchKind } from "@/lib/search";
 
@@ -74,16 +75,16 @@ export function SearchTrigger({ variant }: { variant: "sidebar" | "icon" }) {
 export function SearchPalette({ sections }: { sections: NavSection[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useIsClient();
   const [query, setQuery] = useState("");
-  const [groups, setGroups] = useState<SearchGroup[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Results remember which query they answer, so "searching…" is derived
+  // rather than toggled from inside the fetch effect.
+  const [results, setResults] = useState<{ q: string; groups: SearchGroup[] }>({ q: "", groups: [] });
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const listId = useId();
 
-  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -122,23 +123,16 @@ export function SearchPalette({ sections }: { sections: NavSection[] }) {
   useEffect(() => {
     if (!open) return;
     const q = query.trim();
-    if (q.length < 2) {
-      setGroups([]);
-      setLoading(false);
-      return;
-    }
+    if (q.length < 2) return;
     const ctrl = new AbortController();
-    setLoading(true);
     const t = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: ctrl.signal });
         const data = res.ok ? ((await res.json()) as { groups: SearchGroup[] }) : { groups: [] };
-        setGroups(data.groups);
+        setResults({ q, groups: data.groups });
         setActive(0);
       } catch {
         /* aborted */
-      } finally {
-        if (!ctrl.signal.aborted) setLoading(false);
       }
     }, 160);
     return () => {
@@ -162,6 +156,8 @@ export function SearchPalette({ sections }: { sections: NavSection[] }) {
   );
 
   const q = query.trim();
+  const groups = q.length >= 2 ? results.groups : [];
+  const loading = q.length >= 2 && results.q !== q;
   const matchingPages = q
     ? pages.filter((p) => `${p.title} ${p.subtitle ?? ""}`.toLowerCase().includes(q.toLowerCase())).slice(0, 4)
     : pages;
@@ -178,7 +174,7 @@ export function SearchPalette({ sections }: { sections: NavSection[] }) {
   const close = useCallback(() => {
     setOpen(false);
     setQuery("");
-    setGroups([]);
+    setResults({ q: "", groups: [] });
     setActive(0);
   }, []);
 

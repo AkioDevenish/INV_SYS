@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncedState } from "@/lib/use-synced-state";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -249,13 +250,10 @@ export function VendorsView({
     : "ALL";
 
   const urlQ = searchParams.get("q") ?? "";
-  const [searchInput, setSearchInput] = useState(urlQ);
+  // Follows the URL on Back/Forward while staying editable in between.
+  const [searchInput, setSearchInput] = useSyncedState(urlQ);
   const parsedPage = Math.trunc(Number(searchParams.get("page")));
   const rawPage = Number.isFinite(parsedPage) && parsedPage >= 1 ? parsedPage : 1;
-
-  useEffect(() => {
-    setSearchInput(urlQ);
-  }, [urlQ]);
 
   const updateUrl = useCallback(
     (updates: Record<string, string | null>) => {

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useIsClient } from "@/lib/use-is-client";
 
 let scrollLockCount = 0;
 let savedBodyOverflow: string | null = null;
@@ -110,15 +111,15 @@ export function Modal({
   // ancestor becomes the containing block for `position: fixed`, which pins the
   // dialog inside a sliver of the page instead of the viewport. Rendering into
   // <body> makes the dialog immune to whatever it was triggered from.
-  const [mounted, setMounted] = useState(false);
+  const mounted = useIsClient();
   const modalId = useId();
   const titleId = useId();
   const descId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open || !mounted) return;

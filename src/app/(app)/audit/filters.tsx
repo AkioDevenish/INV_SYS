@@ -1,7 +1,8 @@
 "use client";
 
+import { useSyncedState } from "@/lib/use-synced-state";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useTransition } from "react";
 import { Loader2, Search, X } from "lucide-react";
 import { FilterSelect } from "@/components/filter-select";
 
@@ -22,10 +23,13 @@ export function AuditFilters({
   const [pending, startTransition] = useTransition();
 
   const urlQ = params.get("q") ?? "";
-  const [search, setSearch] = useState(urlQ);
+  // Follows the URL on Back/Forward while staying editable in between.
+  const [search, setSearch] = useSyncedState(urlQ);
 
   const paramsRef = useRef(params);
-  paramsRef.current = params;
+  useEffect(() => {
+    paramsRef.current = params;
+  }, [params]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cancelDebounce = () => {
@@ -35,9 +39,9 @@ export function AuditFilters({
     }
   };
 
+  // A URL change makes any half-typed search stale.
   useEffect(() => {
     cancelDebounce();
-    setSearch(urlQ);
   }, [urlQ]);
 
   useEffect(() => cancelDebounce, []);

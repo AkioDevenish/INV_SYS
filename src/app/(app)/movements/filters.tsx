@@ -1,7 +1,8 @@
 "use client";
 
+import { useSyncedState } from "@/lib/use-synced-state";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useTransition } from "react";
 import { Loader2, Search, X } from "lucide-react";
 
 type ItemOption = { id: number; name: string };
@@ -11,7 +12,8 @@ export function MovementFilters({ items }: { items: ItemOption[] }) {
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
   const urlQ = params.get("q") ?? "";
-  const [search, setSearch] = useState(urlQ);
+  // Follows the URL on Back/Forward while staying editable in between.
+  const [search, setSearch] = useSyncedState(urlQ);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cancelPendingSearch = useCallback(() => {
@@ -21,9 +23,9 @@ export function MovementFilters({ items }: { items: ItemOption[] }) {
     }
   }, []);
 
+  // A URL change makes any half-typed search stale.
   useEffect(() => {
     cancelPendingSearch();
-    setSearch(urlQ);
   }, [urlQ, cancelPendingSearch]);
 
   const apply = useCallback(

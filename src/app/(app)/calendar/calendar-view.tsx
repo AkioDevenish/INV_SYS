@@ -494,7 +494,8 @@ export function CalendarView({
 
   const calendarRef = useRef<FullCalendar | null>(null);
   const pickerRef = useRef<HTMLDivElement | null>(null);
-  const lastAutoFocusedQueryRef = useRef<string>("");
+  const [autoFocusedQuery, setAutoFocusedQuery] = useState("");
+  const [autoFocusDay, setAutoFocusDay] = useState<string | null>(null);
   const pendingAgendaTodayRef = useRef(false);
   const lastKnownSyncedAtRef = useRef<string | null>(syncMeta?.lastSyncedAt ?? null);
   const pageSize = 25;
@@ -599,44 +600,38 @@ export function CalendarView({
     });
   }, [events, typeFilter, staffFilter, search, staff]);
 
-  // Auto-zone the calendar only when the search query itself changes (never hijacking category/staff clicks)
+  // Auto-zone the calendar only when the search query itself changes (never hijacking
+  // category/staff clicks). Done during render, once per new query; only the call
+  // that moves FullCalendar's own view waits for the effect below.
+  const autoQuery = search.trim().toLowerCase();
+  if (autoQuery !== autoFocusedQuery) {
+    if (!autoQuery) {
+      setAutoFocusedQuery("");
+    } else if (filteredEvents.length > 0) {
+      setAutoFocusedQuery(autoQuery);
+      const sorted = filteredEvents.slice().sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+      const currentMonthMatch =
+        selectedMonth !== "all"
+          ? sorted.find((ev) => {
+              const { start, end } = monthBounds(selectedMonth);
+              return eventOverlapsRange(ev, start, end);
+            })
+          : undefined;
+      const match = currentMonthMatch ?? sorted[0];
+      const matchDayKey = trinidadDayKey(match.starts_at);
+      setSelectedYear(Number(matchDayKey.slice(0, 4)));
+      if (selectedMonth !== "all" || layoutMode !== "agenda") {
+        setSelectedMonth(matchDayKey.slice(0, 7));
+      }
+      setSelectedDateKey(matchDayKey);
+      setSelectedEventId(filteredEvents.length === 1 ? match.id : null);
+      setAutoFocusDay(matchDayKey);
+    }
+  }
+
   useEffect(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) {
-      lastAutoFocusedQueryRef.current = "";
-      return;
-    }
-    if (lastAutoFocusedQueryRef.current === q) return;
-    if (filteredEvents.length === 0) return;
-
-    lastAutoFocusedQueryRef.current = q;
-
-    const sorted = filteredEvents
-      .slice()
-      .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
-    const currentMonthMatch =
-      selectedMonth !== "all"
-        ? sorted.find((ev) => {
-            const { start, end } = monthBounds(selectedMonth);
-            return eventOverlapsRange(ev, start, end);
-          })
-        : undefined;
-    const match = currentMonthMatch ?? sorted[0];
-    const matchDayKey = trinidadDayKey(match.starts_at);
-    const matchMonthKey = matchDayKey.slice(0, 7);
-
-    setSelectedYear(Number(matchDayKey.slice(0, 4)));
-    if (selectedMonth !== "all" || layoutMode !== "agenda") {
-      setSelectedMonth(matchMonthKey);
-    }
-    setSelectedDateKey(matchDayKey);
-    setSelectedEventId(filteredEvents.length === 1 ? match.id : null);
-
-    const api = calendarRef.current?.getApi();
-    if (api) {
-      api.gotoDate(matchDayKey);
-    }
-  }, [search, filteredEvents, selectedMonth, layoutMode]);
+    if (autoFocusDay) calendarRef.current?.getApi()?.gotoDate(autoFocusDay);
+  }, [autoFocusDay]);
 
   // Event counts by type (respecting active month/year, search, and staff filters + multi-day overlap)
   const countsByType = useMemo(() => {
@@ -774,12 +769,6 @@ export function CalendarView({
   // Agenda pagination (clamped so deleting the last item on page N never strands on an empty page)
   const totalPages = Math.max(1, Math.ceil(monthFilteredEvents.length / pageSize));
   const safeAgendaPage = Math.min(agendaPage, totalPages);
-
-  useEffect(() => {
-    if (agendaPage > totalPages) {
-      setAgendaPage(totalPages);
-    }
-  }, [agendaPage, totalPages]);
 
   const agendaVisible = monthFilteredEvents.slice(
     (safeAgendaPage - 1) * pageSize,

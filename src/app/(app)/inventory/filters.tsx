@@ -1,7 +1,8 @@
 "use client";
 
+import { useSyncedState } from "@/lib/use-synced-state";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useTransition } from "react";
 import { Loader2, Search, X } from "lucide-react";
 import {
   CONDITIONS,
@@ -35,7 +36,8 @@ export function InventoryFilters({
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
   const urlQ = params.get("q") ?? "";
-  const [search, setSearch] = useState(urlQ);
+  // Follows the URL on Back/Forward while staying editable in between.
+  const [search, setSearch] = useSyncedState(urlQ);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flaggedTotal = FLAGGED_CONDITIONS.reduce((n, c) => n + (conditionCounts[c] ?? 0), 0);
   const retiredTotal = RETIRED_CONDITIONS.reduce((n, c) => n + (conditionCounts[c] ?? 0), 0);
@@ -48,9 +50,9 @@ export function InventoryFilters({
   }, []);
 
   // Keep input synchronized with URL on Back/Forward or tab navigation.
+  // A URL change makes any half-typed search stale.
   useEffect(() => {
     cancelPendingSearch();
-    setSearch(urlQ);
   }, [urlQ, cancelPendingSearch]);
 
   const apply = useCallback(

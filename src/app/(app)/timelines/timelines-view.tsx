@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnChange, useSyncedState } from "@/lib/use-synced-state";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -267,7 +268,8 @@ export function TimelinesView({
   const scheduleYear = yearOptions.includes(rawYear) ? rawYear : thisYear;
 
   const urlQ = searchParams.get("q") ?? "";
-  const [searchInput, setSearchInput] = useState(urlQ);
+  // Follows the URL on Back/Forward while staying editable in between.
+  const [searchInput, setSearchInput] = useSyncedState(urlQ);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelSearchTimer = useCallback(() => {
     if (searchTimerRef.current) {
@@ -275,8 +277,6 @@ export function TimelinesView({
       searchTimerRef.current = null;
     }
   }, []);
-
-  useEffect(() => setSearchInput(urlQ), [urlQ]);
 
   const updateUrl = useCallback(
     (updates: Record<string, string | null>) => {
@@ -493,7 +493,7 @@ export function TimelinesView({
 
   const transitionKey = `${viewMode}-${areaFilter ?? "all"}-${statusFilter}-${priorityFilter}-${leadFilter}-${mine}-${safePage}-${scheduleYear}`;
   // A filter change can hide ticked rows, so ticks never outlive the view they were made in.
-  useEffect(() => setTicked(new Set()), [transitionKey]);
+  useOnChange(transitionKey, () => setTicked(new Set()));
 
   const emptyState = (
     <EmptyState

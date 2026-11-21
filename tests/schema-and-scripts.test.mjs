@@ -17,17 +17,16 @@ const { DEFAULT_ROLE_PERMISSIONS, PERMISSIONS } = loadTs("src/lib/roles.ts");
 
 describe("schema.mjs", () => {
   it("does not pre-insert role_permissions rows on an empty fresh database (prevents admin lockout)", () => {
+    // Later releases grant new permissions to existing matrices once each. Every
+    // such insert must be a one-off migration and only run when a matrix exists,
+    // so a fresh database is still seeded from the defaults by the app.
     const matches = [...SCHEMA_SQL.matchAll(/INSERT\s+INTO\s+role_permissions\b/gi)];
-    assert.equal(
-      matches.length,
-      1,
-      "Expected at most one conditional role_permissions migration insert in SCHEMA_SQL",
-    );
-
-    const idx = matches[0].index;
-    const surrounding = SCHEMA_SQL.slice(Math.max(0, idx - 260), idx + 260);
-    assert.match(surrounding, /IF\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+role_permissions\s*\)/i);
-    assert.match(surrounding, /app_migrations\s+WHERE\s+key\s*=\s*'projects_permissions_v1'/i);
+    assert.ok(matches.length >= 1, "Expected the one-off permission grant migrations in SCHEMA_SQL");
+    for (const m of matches) {
+      const before = SCHEMA_SQL.slice(Math.max(0, m.index - 260), m.index);
+      assert.match(before, /IF\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+role_permissions\s*\)/i);
+      assert.match(before, /app_migrations\s+WHERE\s+key\s*=\s*'[a-z_]+_permissions_v\d+'/i);
+    }
   });
 
   it("declares core, project, vendor, calendar, and timeline tables and constraints", () => {
@@ -79,9 +78,9 @@ describe("schema.mjs", () => {
 });
 
 describe("scripts/_lib.mjs", () => {
-  it("lists all 33 tables in dependency-safe DROP order (children before parents)", () => {
-    assert.equal(ALL_TABLES.length, 33);
-    assert.equal(SERIAL_TABLES.length, 26);
+  it("lists all 38 tables in dependency-safe DROP order (children before parents)", () => {
+    assert.equal(ALL_TABLES.length, 38);
+    assert.equal(SERIAL_TABLES.length, 30);
     assert.deepEqual(SCRIPT_PERMISSIONS, PERMISSIONS);
     assert.deepEqual(SCRIPT_DEFAULT_ROLE_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS);
 
@@ -96,6 +95,11 @@ describe("scripts/_lib.mjs", () => {
       ["role_permissions", "users"],
       ["audit_logs", "users"],
       ["project_actions", "projects"],
+      ["project_files", "document_resources"],
+      ["notifications", "users"],
+      ["comments", "users"],
+      ["saved_views", "users"],
+      ["reminder_log", "users"],
       ["projects", "project_statuses"],
     ]) {
       assert.ok(idx(child) !== -1 && idx(parent) !== -1, `Missing ${child} or ${parent}`);

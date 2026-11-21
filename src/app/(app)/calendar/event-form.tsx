@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnChange } from "@/lib/use-synced-state";
 import { FilterSelect } from "@/components/filter-select";
 
 import {
@@ -239,10 +240,11 @@ export function EventFormFields({
       });
     }
     return list;
-  }, [staff, event?.organiser_id, event?.organiser_name]);
+  }, [staff, event]);
 
-  useEffect(() => {
-    if (!state.ok) return;
+  // A new successful save clears the form (when adding) during render...
+  useOnChange(state, (next) => {
+    if (!next.ok) return;
     if (!isEdit) {
       setTitle("");
       setEventType("MEETING");
@@ -254,8 +256,12 @@ export function EventFormFields({
       setDescription("");
     }
     setClientError(null);
-    onSaved?.();
-  }, [state.ok, isEdit, onSaved, defaultStart, defaultEnd]);
+  });
+
+  // ...and tells the parent, which may close the dialog.
+  useEffect(() => {
+    if (state.ok) onSaved?.();
+  }, [state, onSaved]);
 
   const startDatePart = startDt.slice(0, 10);
   const endDatePart = endDt.slice(0, 10);

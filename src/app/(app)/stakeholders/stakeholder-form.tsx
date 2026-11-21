@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnChange } from "@/lib/use-synced-state";
 import Link from "next/link";
 import { useActionState, useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -58,14 +59,15 @@ function GroupSelect({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
-  useEffect(() => {
+  // New groups from the server are merged in, keeping any created here meanwhile.
+  useOnChange(groups, (next) => {
     setOptions((current) => {
       const merged = new Map<number, Group>();
-      for (const g of groups) merged.set(g.id, g);
+      for (const g of next) merged.set(g.id, g);
       for (const g of current) if (!merged.has(g.id)) merged.set(g.id, g);
       return [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
     });
-  }, [groups]);
+  });
 
   const create = async () => {
     const trimmed = name.trim();

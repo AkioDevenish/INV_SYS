@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    // Local `vercel build` output: generated, never committed.
+    ".vercel/**",
     "next-env.d.ts",
   ]),
 ]);

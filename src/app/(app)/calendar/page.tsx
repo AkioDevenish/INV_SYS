@@ -28,6 +28,11 @@ function parseValidMonthParam(raw: string | undefined, fallback: string): string
   return `${match[1]}-${match[2]}`;
 }
 
+/** Today in Trinidad (UTC-4, no daylight saving) as YYYY-MM-DD. */
+function astTodayKey(): string {
+  return new Date(Date.now() - 4 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 export default async function CalendarPage({
   searchParams,
 }: {
@@ -41,8 +46,7 @@ export default async function CalendarPage({
   const params = await searchParams;
   const rawMonth = Array.isArray(params.month) ? params.month[0] : params.month;
 
-  const astNow = new Date(Date.now() - 4 * 3600 * 1000);
-  const todayKey = astNow.toISOString().slice(0, 10);
+  const todayKey = astTodayKey();
   const currentMonth = todayKey.slice(0, 7);
   const initialMonth = parseValidMonthParam(rawMonth, currentMonth);
 
